@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+
+/* Pakistani government — light green & white theme */
+@theme {
+  --color-sidebar: #0f5132;
+  --color-sidebar-hover: #157347;
+  --color-portal-bg: #f2faf5;
+  --color-portal-primary: #006435;
+  --color-portal-primary-hover: #004d28;
+  --color-portal-accent: #c9a227;
+  --color-portal-light: #e8f5ec;
+  --color-portal-surface: #ffffff;
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--color-portal-bg);
+}
+
+/* Primary action buttons — green with white text */
+.btn-portal-primary {
+  background-color: var(--color-portal-primary);
+  color: white;
+}
+.btn-portal-primary:hover {
+  background-color: var(--color-portal-primary-hover);
+}
