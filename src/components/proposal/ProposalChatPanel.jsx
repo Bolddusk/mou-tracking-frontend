@@ -172,16 +172,16 @@ export default function ProposalChatPanel({ proposalId, token, currentUserId, en
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-3 sm:max-w-[70%] ${
                     isMine
-                      ? 'rounded-br-md bg-portal-primary text-slate-900'
-                      : 'rounded-bl-md border border-slate-200 bg-slate-50 text-slate-800'
+                      ? 'rounded-br-md bg-portal-primary text-white shadow-sm'
+                      : 'rounded-bl-md border border-emerald-100 bg-emerald-50/80 text-slate-800'
                   }`}
                 >
                   {!isMine && (
                     <div className="mb-1 flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-semibold text-slate-800">
+                      <span className="text-xs font-semibold text-emerald-900">
                         {msg.senderName}
                       </span>
-                      <span className="rounded bg-white/80 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                      <span className="rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
                         {roleLabel(msg.senderRole)}
                       </span>
                     </div>
@@ -189,7 +189,11 @@ export default function ProposalChatPanel({ proposalId, token, currentUserId, en
                   <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                     {msg.text}
                   </p>
-                  <time className="mt-1.5 block text-[10px] opacity-70">
+                  <time
+                    className={`mt-1.5 block text-[10px] ${
+                      isMine ? 'text-emerald-100' : 'text-slate-500'
+                    }`}
+                  >
                     {formatMessageTime(msg.sentAt)}
                   </time>
                 </div>
