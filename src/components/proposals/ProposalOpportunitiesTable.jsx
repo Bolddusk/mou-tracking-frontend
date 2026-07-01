@@ -3,6 +3,7 @@ import LoadingSpinner from '../LoadingSpinner'
 import PokeStatusBadge from '../PokeStatusBadge'
 import StatusBadge from '../StatusBadge'
 import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
+import { COOPERATION_MODE_LABELS } from '../../constants/proposalFilters'
 import { formatDate } from '../../utils/format'
 import { getPartyADisplay, getPartyBDisplay } from '../../utils/proposalDisplay'
 
@@ -16,6 +17,7 @@ export default function ProposalOpportunitiesTable({
   rowClassName,
   renderUpdateExtra,
   renderStatusExtra,
+  showCooperationMode = false,
 }) {
   if (loading) {
     return (
@@ -38,6 +40,9 @@ export default function ProposalOpportunitiesTable({
             <th className="px-4 py-3 font-semibold">Party A</th>
             <th className="px-4 py-3 font-semibold">Party B</th>
             <th className="px-4 py-3 font-semibold">Sector</th>
+            {showCooperationMode && (
+              <th className="px-4 py-3 font-semibold">Mode</th>
+            )}
             <th className="px-4 py-3 font-semibold">Pitch</th>
             <th className="px-4 py-3 font-semibold">MOU</th>
             <th className="px-4 py-3 font-semibold">Status</th>
@@ -62,6 +67,18 @@ export default function ProposalOpportunitiesTable({
                   {getPartyBDisplay(p)}
                 </td>
                 <td className="px-4 py-3 text-slate-600">{p.sector || '—'}</td>
+                {showCooperationMode && (
+                  <td className="px-4 py-3">
+                    {p.cooperation_mode ? (
+                      <span className="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-800 ring-1 ring-green-200">
+                        {COOPERATION_MODE_LABELS[p.cooperation_mode] ||
+                          p.cooperation_mode.replace(/_/g, ' ')}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+                )}
                 <td className="px-4 py-3">
                   <DocLink
                     url={p.proposal_file_url}

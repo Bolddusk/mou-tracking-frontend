@@ -42,12 +42,42 @@ export async function getSectorLeadProposals(status) {
   return response.data
 }
 
-/** @param {string|Record<string, string|boolean|undefined>} [params] */
+/** @param {string|Record<string, string|number|boolean|undefined>} [params] */
 export async function getAllProposals(params) {
+  const { data } = await getAllProposalsPaginated(params)
+  return data
+}
+
+/**
+ * Paginated list for Super Admin — GET /api/proposals/all
+ * @returns {{ data: object[], pagination: object|null, filters: object }}
+ */
+export async function getAllProposalsPaginated(params) {
   const resolved =
     typeof params === 'string' ? (params ? { status: params } : {}) : params || {}
   const response = await client.get('/api/proposals/all', { params: resolved })
-  return response.data
+  const body = response.data
+
+  if (Array.isArray(body)) {
+    return {
+      data: body,
+      pagination: {
+        page: 1,
+        limit: body.length,
+        total: body.length,
+        total_pages: 1,
+        has_next: false,
+        has_prev: false,
+      },
+      filters: {},
+    }
+  }
+
+  return {
+    data: Array.isArray(body?.data) ? body.data : [],
+    pagination: body?.pagination ?? null,
+    filters: body?.filters ?? {},
+  }
 }
 
 export async function getProposalFilterOptions() {
@@ -57,6 +87,11 @@ export async function getProposalFilterOptions() {
 
 export async function getProposalById(id) {
   const response = await client.get(`/api/proposals/${id}`)
+  return response.data
+}
+
+export async function patchProposalPartyContacts(proposalId, body) {
+  const response = await client.patch(`/api/proposals/${proposalId}/party-contacts`, body)
   return response.data
 }
 

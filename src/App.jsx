@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { SectorsProvider } from './context/SectorsContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AuthLayout from './components/layout/AuthLayout'
 import DashboardLayout from './components/layout/DashboardLayout'
@@ -23,6 +24,7 @@ import ComplaintDetail from './pages/complaints/ComplaintDetail'
 import UsersList from './pages/admin/UsersList'
 import NewUser from './pages/admin/NewUser'
 import UserDetail from './pages/admin/UserDetail'
+import SectorsAdmin from './pages/admin/SectorsAdmin'
 import SectorLeadReassign from './pages/admin/SectorLeadReassign'
 import SectorLeadHandoff from './pages/admin/SectorLeadHandoff'
 import ComplianceFilingsOverview from './pages/admin/ComplianceFilingsOverview'
@@ -120,6 +122,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <SectorsProvider>
         <Routes>
           <Route path="/" element={<HomeRedirect />} />
 
@@ -330,8 +333,13 @@ export default function App() {
             <Route path="/admin/users/:id" element={<UserDetail />} />
           </Route>
 
+          <Route element={<RoleShell title="Sectors" allowedRole={ROLES.SUPER_ADMIN} />}>
+            <Route path="/admin/sectors" element={<SectorsAdmin />} />
+          </Route>
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </SectorsProvider>
       </AuthProvider>
     </BrowserRouter>
   )

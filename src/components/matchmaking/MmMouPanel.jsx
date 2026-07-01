@@ -6,7 +6,7 @@ import DocLink from '../DocLink'
 import FilePreviewModal from '../FilePreviewModal'
 import LoadingSpinner from '../LoadingSpinner'
 import { MM_MOU_STATUS_LABELS, MM_MOU_STATUS_ORDER } from '../../constants/matchmaking'
-import { SECTORS } from '../../constants/sectors'
+import { useSectors } from '../../context/SectorsContext'
 import { formatDate, getErrorMessage, resolveFileUrl } from '../../utils/format'
 import MmMouStatusBadge from './MmMouStatusBadge'
 import CloseDealButton from './CloseDealButton'
@@ -16,7 +16,7 @@ import MouVersionHistory, { MouVersionBadge } from './MouVersionHistory'
 const EMPTY_FORM = {
   mou_scope: '',
   mou_description: '',
-  mou_sector: SECTORS[0],
+  mou_sector: '',
   mou_demand: '',
 }
 
@@ -29,6 +29,8 @@ export default function MmMouPanel({
   onStatusChange,
   onDealClosed,
 }) {
+  const { sectors } = useSectors()
+  const defaultSector = sectors[0] || ''
   const isDirectProposal = Boolean(proposalId && !matchId)
   const [mouData, setMouData] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -73,7 +75,7 @@ export default function MmMouPanel({
       setForm({
         mou_scope: mou.mou_scope || '',
         mou_description: mou.mou_description || '',
-        mou_sector: mou.mou_sector || SECTORS[0],
+        mou_sector: mou.mou_sector || defaultSector,
         mou_demand: mou.mou_demand || '',
       })
       onStatusChange?.(data?.mou_status)
@@ -84,7 +86,7 @@ export default function MmMouPanel({
     } finally {
       setLoading(false)
     }
-  }, [matchId, proposalId, isDirectProposal, onStatusChange])
+  }, [matchId, proposalId, isDirectProposal, onStatusChange, defaultSector])
 
   useEffect(() => {
     load()
@@ -341,7 +343,7 @@ export default function MmMouPanel({
                   onChange={(e) => setForm((f) => ({ ...f, mou_sector: e.target.value }))}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/30"
                 >
-                  {SECTORS.map((s) => (
+                  {sectors.map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>

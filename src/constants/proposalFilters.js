@@ -53,6 +53,10 @@ export function getProposalSearchText(proposal) {
     proposal.party_b_info?.contact_name,
     proposal.party_b_info?.organization_name,
     proposal.sector,
+    proposal.external_reference,
+    proposal.cooperation_mode,
+    proposal.conference_name,
+    proposal.conference_key,
     proposal.id != null ? String(proposal.id) : '',
   ]
   return parts.filter(Boolean).join(' ').toLowerCase()
@@ -74,22 +78,56 @@ export const BOOL_FILTER_OPTIONS = [
   { value: 'false', label: 'No' },
 ]
 
+export const COOPERATION_MODE_LABELS = {
+  mou: 'MoU',
+  jv: 'JV',
+  agreement: 'Agreement',
+}
+
+const DEFAULT_COOPERATION_MODES = ['mou', 'jv', 'agreement']
+
+/** Tab filters for cooperation mode (All + API options). */
+export function buildCooperationModeFilters(cooperationModes) {
+  const modes =
+    Array.isArray(cooperationModes) && cooperationModes.length
+      ? cooperationModes
+      : DEFAULT_COOPERATION_MODES.map((value) => ({ value, label: COOPERATION_MODE_LABELS[value] }))
+
+  return [
+    { key: '', label: 'All' },
+    ...modes.map((mode) => {
+      const value = typeof mode === 'string' ? mode : mode.value
+      const label =
+        typeof mode === 'string'
+          ? COOPERATION_MODE_LABELS[mode] || mode
+          : mode.label || COOPERATION_MODE_LABELS[mode.value] || mode.value
+      return { key: value, label }
+    }),
+  ]
+}
+
 /** Build query params for GET /api/proposals/all (omit empty values). */
 export function buildProposalListParams({
   status = '',
   sector = '',
   mou_status = '',
+  cooperation_mode = '',
+  conference_key = '',
   q = '',
   date_from = '',
   date_to = '',
   has_mou = '',
   has_pitch = '',
   deal_closed = '',
+  page = 1,
+  limit = 20,
 } = {}) {
   const params = {}
   if (status) params.status = status
   if (sector) params.sector = sector
   if (mou_status) params.mou_status = mou_status
+  if (cooperation_mode) params.cooperation_mode = cooperation_mode
+  if (conference_key) params.conference_key = conference_key
   const trimmedQ = q?.trim()
   if (trimmedQ) params.q = trimmedQ
   if (date_from) params.date_from = date_from
@@ -97,7 +135,22 @@ export function buildProposalListParams({
   if (has_mou === 'true' || has_mou === 'false') params.has_mou = has_mou
   if (has_pitch === 'true' || has_pitch === 'false') params.has_pitch = has_pitch
   if (deal_closed === 'true' || deal_closed === 'false') params.deal_closed = deal_closed
+  if (page != null && page > 0) params.page = page
+  if (limit != null && limit > 0) params.limit = limit
   return params
+}
+
+export const PAGE_SIZE_OPTIONS = [10, 20, 50]
+
+export function getPaginationRange(pagination) {
+  if (!pagination?.total) {
+    return { start: 0, end: 0, total: 0 }
+  }
+  const page = pagination.page || 1
+  const limit = pagination.limit || 20
+  const start = (page - 1) * limit + 1
+  const end = Math.min(page * limit, pagination.total)
+  return { start, end, total: pagination.total }
 }
 
 export function getProposalListEmptyMessage({

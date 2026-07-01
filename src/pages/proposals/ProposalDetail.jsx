@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom'
 import * as activitiesApi from '../../api/activities'
 import * as mmApi from '../../api/matchmaking'
@@ -14,7 +14,9 @@ import DocLink from '../../components/DocLink'
 import FilePreviewModal from '../../components/FilePreviewModal'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import Modal from '../../components/Modal'
+import PartyBCredentialsModal from '../../components/PartyBCredentialsModal'
 import ProposalChatPanel from '../../components/proposal/ProposalChatPanel'
+import ProposalPartyContactsEditor from '../../components/proposal/ProposalPartyContactsEditor'
 import ProposalExportMenu from '../../components/proposal/ProposalExportMenu'
 import ProposalExportReportModal from '../../components/proposal/ProposalExportReportModal'
 import MmMouPanel from '../../components/matchmaking/MmMouPanel'
@@ -29,6 +31,12 @@ import { ROLE_LABELS } from '../../constants/sectors'
 import { formatDate, getErrorMessage, resolveFileUrl } from '../../utils/format'
 import { formatUpdateRequestLabel } from '../../utils/proposalDisplay'
 import { loadDraftFromProposal } from '../../utils/proposalDraft'
+import {
+  buildCredentialPrompts,
+  getPartyContactSaveFeedback,
+  mergeProposalAfterPartyContacts,
+  needsPartyAAccountSetup,
+} from '../../utils/partyContactProvision'
 
 const ACTIVITY_STATUS_STYLES = {
   pending: 'bg-amber-100 text-amber-800 ring-amber-200',
@@ -84,6 +92,9 @@ export default function ProposalDetail() {
   const [exportLoading, setExportLoading] = useState(false)
   const [mmMatch, setMmMatch] = useState(null)
   const [mouStatus, setMouStatus] = useState(null)
+  const [contactsEditorOpen, setContactsEditorOpen] = useState(false)
+  const [credentialModal, setCredentialModal] = useState(null)
+  const credentialQueueRef = useRef([])
 
   const canReview = isSectorLead || isSuperAdmin
   const canExportReport = canReview
@@ -176,10 +187,35 @@ export default function ProposalDetail() {
 
   const canMarkSigned = (isSectorLead || isSuperAdmin) && !isDealClosed
 
+  const canEditPartyContacts = Boolean(proposal?.capabilities?.can_edit_party_contacts)
+
+  const enqueueCredentialPrompts = (prompts) => {
+    if (!prompts.length) return
+    credentialQueueRef.current = prompts.slice(1)
+    setCredentialModal(prompts[0])
+  }
+
+  const closeCredentialModal = () => {
+    const next = credentialQueueRef.current.shift()
+    if (next) setCredentialModal(next)
+    else setCredentialModal(null)
+  }
+
+  const handlePartyContactsSaved = (res) => {
+    setProposal((prev) => mergeProposalAfterPartyContacts(prev, res))
+
+    const { success, errors } = getPartyContactSaveFeedback(res)
+    setSuccess(success)
+    if (errors.length) setError(errors.join(' '))
+
+    enqueueCredentialPrompts(buildCredentialPrompts(res.party_a, res.party_b))
+  }
+
   const activeTab = useMemo(() => {
     const tab = searchParams.get('tab')
     if (tab === 'chat' && canChat) return 'chat'
     if (tab === 'mou' && canMou) return 'mou'
+    if (tab === 'activities') return 'activities'
     return 'details'
   }, [searchParams, canChat, canMou])
 
@@ -188,6 +224,8 @@ export default function ProposalDetail() {
       setSearchParams({ tab: 'chat' }, { replace: true })
     } else if (tab === 'mou' && canMou) {
       setSearchParams({ tab: 'mou' }, { replace: true })
+    } else if (tab === 'activities') {
+      setSearchParams({ tab: 'activities' }, { replace: true })
     } else {
       setSearchParams({}, { replace: true })
     }
@@ -692,6 +730,16 @@ export default function ProposalDetail() {
         <DetailTabButton active={activeTab === 'details'} onClick={() => setTab('details')}>
           Details
         </DetailTabButton>
+        {canTrackActivities && (
+          <DetailTabButton active={activeTab === 'activities'} onClick={() => setTab('activities')}>
+            Activities
+            {pendingCount > 0 && (
+              <span className="ml-1.5 inline-flex rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                {pendingCount}
+              </span>
+            )}
+          </DetailTabButton>
+        )}
         {canChat && (
           <DetailTabButton active={activeTab === 'chat'} onClick={() => setTab('chat')}>
             Chat
@@ -714,86 +762,6 @@ export default function ProposalDetail() {
           onStatusChange={setMouStatus}
           onDealClosed={handleDealClosed}
         />
-      ) : activeTab === 'details' ? (
-        <>
-          <ProposalDetailPanel
-            proposal={proposal}
-            onOpenFile={(url, title) => setFilePreview({ url, title })}
-          />
-
-          {/* Timeline */}
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">Activity Timeline</h2>
-            <p className="text-sm text-slate-500">Progress updates and review history</p>
-          </div>
-          {canTrackActivities && (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              {activities.length} entries
-            </span>
-          )}
-        </div>
-
-        <div className="px-6 py-6">
-          {isDraft ? (
-            <EmptyState
-              icon="📝"
-              title="Not submitted yet"
-              text="Submit this opportunity to start tracking activities and reviews."
-            />
-          ) : activities.length === 0 ? (
-            <EmptyState
-              icon="📭"
-              title="No activities yet"
-              text="Add a progress update or request an update from Party A."
-            />
-          ) : (
-            <div className="relative space-y-0">
-              <div className="absolute bottom-4 left-[11px] top-4 w-0.5 bg-gradient-to-b from-green-400 via-green-200 to-transparent" />
-              {activities.map((activity, index) => (
-                <ActivityCard
-                  key={activity.id}
-                  activity={activity}
-                  isLast={index === activities.length - 1}
-                  isCardExpanded={expandedActivityId === activity.id}
-                  onToggleCard={() =>
-                    setExpandedActivityId((prev) =>
-                      prev === activity.id ? null : activity.id
-                    )
-                  }
-                  canReview={canReview && !isRfpEngagement && !isDealClosed}
-                  canComment={!isRfpEngagement && !isDealClosed}
-                  actionLoading={actionLoading}
-                  expanded={expandedComments[activity.id]}
-                  commentDraft={commentDrafts[activity.id] || ''}
-                  onToggleComments={() =>
-                    setExpandedComments((e) => ({ ...e, [activity.id]: !e[activity.id] }))
-                  }
-                  onCommentDraftChange={(val) =>
-                    setCommentDrafts((d) => ({ ...d, [activity.id]: val }))
-                  }
-                  onAddComment={() => handleAddComment(activity.id)}
-                  onOpenFile={(url, title) =>
-                    setFilePreview({ url: resolveFileUrl(url), title })
-                  }
-                  onApprove={() => {
-                    setApproveTarget(activity)
-                    setApproveComment('')
-                  }}
-                  onReject={() => {
-                    setRejectTarget(activity)
-                    setRejectComment('')
-                  }}
-                  showRespondToPoke={isPartyA && activity.can_respond}
-                  onRespondToPoke={() => openActivityModal(true, activity.id)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-        </>
       ) : activeTab === 'chat' ? (
         <ProposalChatPanel
           proposalId={Number(id)}
@@ -801,7 +769,107 @@ export default function ProposalDetail() {
           currentUserId={user?.id}
           enabled={activeTab === 'chat' && canChat}
         />
-      ) : null}
+      ) : activeTab === 'activities' ? (
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Activity Timeline</h2>
+              <p className="text-sm text-slate-500">Progress updates and review history</p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              {activities.length} entries
+            </span>
+          </div>
+
+          <div className="px-6 py-6">
+            {activities.length === 0 ? (
+              <EmptyState
+                icon="📭"
+                title="No activities yet"
+                text="Add a progress update or request an update from Party A."
+              />
+            ) : (
+              <div className="relative space-y-0">
+                <div className="absolute bottom-4 left-[11px] top-4 w-0.5 bg-gradient-to-b from-green-400 via-green-200 to-transparent" />
+                {activities.map((activity, index) => (
+                  <ActivityCard
+                    key={activity.id}
+                    activity={activity}
+                    isLast={index === activities.length - 1}
+                    isCardExpanded={expandedActivityId === activity.id}
+                    onToggleCard={() =>
+                      setExpandedActivityId((prev) =>
+                        prev === activity.id ? null : activity.id,
+                      )
+                    }
+                    canReview={canReview && !isRfpEngagement && !isDealClosed}
+                    canComment={!isRfpEngagement && !isDealClosed}
+                    actionLoading={actionLoading}
+                    expanded={expandedComments[activity.id]}
+                    commentDraft={commentDrafts[activity.id] || ''}
+                    onToggleComments={() =>
+                      setExpandedComments((e) => ({ ...e, [activity.id]: !e[activity.id] }))
+                    }
+                    onCommentDraftChange={(val) =>
+                      setCommentDrafts((d) => ({ ...d, [activity.id]: val }))
+                    }
+                    onAddComment={() => handleAddComment(activity.id)}
+                    onOpenFile={(url, title) =>
+                      setFilePreview({ url: resolveFileUrl(url), title })
+                    }
+                    onApprove={() => {
+                      setApproveTarget(activity)
+                      setApproveComment('')
+                    }}
+                    onReject={() => {
+                      setRejectTarget(activity)
+                      setRejectComment('')
+                    }}
+                    showRespondToPoke={isPartyA && activity.can_respond}
+                    onRespondToPoke={() => openActivityModal(true, activity.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      ) : (
+        <>
+          {canEditPartyContacts && (
+            <div className="flex flex-col gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1 text-sm text-green-900">
+                {needsPartyAAccountSetup(proposal) && (
+                  <p>
+                    <strong>Party A not linked</strong> — enter contact name + email to create
+                    their portal login.
+                  </p>
+                )}
+                {!proposal.party_b_user_id && (
+                  <p>
+                    <strong>Party B not linked</strong> — add their email and save to enable chat
+                    login.
+                  </p>
+                )}
+                {!needsPartyAAccountSetup(proposal) && proposal.party_b_user_id && (
+                  <p>You can update Party A and Party B contact details for this proposal.</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setContactsEditorOpen(true)}
+                className="shrink-0 rounded-lg bg-portal-primary px-4 py-2 text-sm font-semibold text-white hover:bg-portal-primary-hover"
+              >
+                Edit contacts
+              </button>
+            </div>
+          )}
+
+          <ProposalDetailPanel
+            proposal={proposal}
+            onOpenFile={(url, title) => setFilePreview({ url, title })}
+          />
+        </>
+      )}
 
       <Modal
         open={showAddActivity}
@@ -909,6 +977,22 @@ export default function ProposalDetail() {
         title={filePreview?.title}
         fileUrl={filePreview?.url}
         onClose={() => setFilePreview(null)}
+      />
+
+      <ProposalPartyContactsEditor
+        open={contactsEditorOpen}
+        proposalId={Number(id)}
+        proposal={proposal}
+        onClose={() => setContactsEditorOpen(false)}
+        onSaved={handlePartyContactsSaved}
+      />
+
+      <PartyBCredentialsModal
+        open={Boolean(credentialModal)}
+        title={credentialModal?.title}
+        credentials={credentialModal?.credentials}
+        subtitle={credentialModal?.subtitle}
+        onClose={closeCredentialModal}
       />
 
       <Modal

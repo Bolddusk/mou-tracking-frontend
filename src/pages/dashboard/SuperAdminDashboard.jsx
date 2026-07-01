@@ -15,9 +15,11 @@ import Modal from '../../components/Modal'
 import PartyBCredentialsModal from '../../components/PartyBCredentialsModal'
 import StatCard from '../../components/StatCard'
 import ProposalOpportunitiesFilterBar from '../../components/proposals/ProposalOpportunitiesFilterBar'
+import ProposalOpportunitiesPagination from '../../components/proposals/ProposalOpportunitiesPagination'
 import ProposalOpportunitiesTable from '../../components/proposals/ProposalOpportunitiesTable'
 import ProposalOpportunitiesToolbar from '../../components/proposals/ProposalOpportunitiesToolbar'
 import {
+  buildCooperationModeFilters,
   buildProposalListParams,
   getProposalListEmptyMessage,
   PROPOSAL_STATUS_FILTERS,
@@ -25,6 +27,8 @@ import {
 import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { getErrorMessage } from '../../utils/format'
 import { loadDraftFromProposal } from '../../utils/proposalDraft'
+
+const DEFAULT_PAGE_LIMIT = 20
 
 const EMPTY_ADVANCED_FILTERS = {
   sector: '',
@@ -39,12 +43,18 @@ const EMPTY_ADVANCED_FILTERS = {
 export default function SuperAdminDashboard() {
   const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState('')
+  const [cooperationModeFilter, setCooperationModeFilter] = useState('')
+  const [conferenceFilter, setConferenceFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT)
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [advancedFilters, setAdvancedFilters] = useState(EMPTY_ADVANCED_FILTERS)
   const [filterOptions, setFilterOptions] = useState(null)
   const [proposals, setProposals] = useState([])
+  const [pagination, setPagination] = useState(null)
   const [statsProposals, setStatsProposals] = useState([])
+  const [statsTotal, setStatsTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -69,12 +79,22 @@ export default function SuperAdminDashboard() {
         if (!cancelled) setFilterOptions(data)
       })
       .catch(() => {
-        if (!cancelled) setFilterOptions({ sectors: [], proposal_statuses: [], mou_statuses: [] })
+        if (!cancelled) setFilterOptions({ sectors: [], proposal_statuses: [], mou_statuses: [], cooperation_modes: [], conferences: [] })
       })
     return () => {
       cancelled = true
     }
   }, [])
+
+  const cooperationModeFilters = useMemo(
+    () => buildCooperationModeFilters(filterOptions?.cooperation_modes),
+    [filterOptions?.cooperation_modes],
+  )
+
+  const selectedConference = useMemo(
+    () => (filterOptions?.conferences || []).find((c) => c.key === conferenceFilter) || null,
+    [filterOptions?.conferences, conferenceFilter],
+  )
 
   const listParams = useMemo(
     () =>
@@ -82,22 +102,32 @@ export default function SuperAdminDashboard() {
         status: statusFilter,
         sector: advancedFilters.sector,
         mou_status: advancedFilters.mouStatus,
+        cooperation_mode: cooperationModeFilter,
+        conference_key: conferenceFilter,
         q: searchQuery,
         date_from: advancedFilters.dateFrom,
         date_to: advancedFilters.dateTo,
         has_mou: advancedFilters.hasMou,
         has_pitch: advancedFilters.hasPitch,
         deal_closed: advancedFilters.dealClosed,
+        page,
+        limit,
       }),
-    [statusFilter, searchQuery, advancedFilters],
+    [statusFilter, searchQuery, advancedFilters, cooperationModeFilter, conferenceFilter, page, limit],
   )
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, cooperationModeFilter, conferenceFilter, searchQuery, advancedFilters])
 
   const loadStats = useCallback(async () => {
     try {
-      const data = await proposalsApi.getAllProposals()
-      setStatsProposals(Array.isArray(data) ? data : [])
+      const result = await proposalsApi.getAllProposalsPaginated({ limit: 100, page: 1 })
+      setStatsProposals(result.data)
+      setStatsTotal(result.pagination?.total ?? result.data.length)
     } catch {
       setStatsProposals([])
+      setStatsTotal(0)
     }
   }, [])
 
@@ -105,11 +135,13 @@ export default function SuperAdminDashboard() {
     setLoading(true)
     setError('')
     try {
-      const data = await proposalsApi.getAllProposals(listParams)
-      setProposals(Array.isArray(data) ? data : [])
+      const result = await proposalsApi.getAllProposalsPaginated(listParams)
+      setProposals(result.data)
+      setPagination(result.pagination)
     } catch (err) {
       setError(getErrorMessage(err))
       setProposals([])
+      setPagination(null)
     } finally {
       setLoading(false)
     }
@@ -124,23 +156,27 @@ export default function SuperAdminDashboard() {
   }, [load])
 
   const stats = useMemo(() => {
-    const counts = { total: statsProposals.length, draft: 0, submitted: 0, approved: 0, rejected: 0 }
+    const counts = { total: statsTotal, draft: 0, submitted: 0, approved: 0, rejected: 0 }
     for (const p of statsProposals) {
       const s = (p.status || '').toLowerCase()
       if (s in counts) counts[s]++
     }
     return counts
-  }, [statsProposals])
+  }, [statsProposals, statsTotal])
 
   const hasActiveAdvancedFilters = useMemo(
     () => Object.values(advancedFilters).some(Boolean),
     [advancedFilters],
   )
 
-  const hasActiveFilters = hasActiveAdvancedFilters || Boolean(searchQuery.trim())
+  const hasActiveFilters =
+    hasActiveAdvancedFilters ||
+    Boolean(searchQuery.trim()) ||
+    Boolean(cooperationModeFilter) ||
+    Boolean(conferenceFilter)
 
   const emptyMessage = getProposalListEmptyMessage({
-    totalCount: proposals.length,
+    totalCount: pagination?.total ?? proposals.length,
     statusFilter,
     searchQuery,
     statusFilters: PROPOSAL_STATUS_FILTERS.superAdmin,
@@ -153,6 +189,10 @@ export default function SuperAdminDashboard() {
     setSearchInput('')
     setSearchQuery('')
     setStatusFilter('')
+    setCooperationModeFilter('')
+    setConferenceFilter('')
+    setPage(1)
+    setLimit(DEFAULT_PAGE_LIMIT)
     setAdvancedFilters(EMPTY_ADVANCED_FILTERS)
   }
 
@@ -289,10 +329,17 @@ export default function SuperAdminDashboard() {
         />
 
         <ProposalOpportunitiesFilterBar
+          conferenceKey={conferenceFilter}
+          onConferenceChange={setConferenceFilter}
+          conferences={filterOptions?.conferences || []}
+          selectedConference={selectedConference}
           sector={advancedFilters.sector}
           onSectorChange={(v) => setAdvanced('sector', v)}
           mouStatus={advancedFilters.mouStatus}
           onMouStatusChange={(v) => setAdvanced('mouStatus', v)}
+          cooperationMode={cooperationModeFilter}
+          onCooperationModeChange={setCooperationModeFilter}
+          cooperationModeFilters={cooperationModeFilters}
           hasMou={advancedFilters.hasMou}
           onHasMouChange={(v) => setAdvanced('hasMou', v)}
           hasPitch={advancedFilters.hasPitch}
@@ -313,6 +360,7 @@ export default function SuperAdminDashboard() {
           proposals={proposals}
           loading={loading}
           emptyMessage={emptyMessage}
+          showCooperationMode
           onView={handleView}
           onOpenFile={openFile}
           renderActions={(p) => (
@@ -341,6 +389,18 @@ export default function SuperAdminDashboard() {
                         )}
             </ActionGroup>
           )}
+        />
+
+        <ProposalOpportunitiesPagination
+          pagination={pagination}
+          limit={limit}
+          onLimitChange={(newLimit) => {
+            setPage(1)
+            setLimit(newLimit)
+          }}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => p + 1)}
+          loading={loading}
         />
       </div>
 

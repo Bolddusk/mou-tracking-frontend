@@ -1,5 +1,6 @@
 import { MM_MOU_STATUS_LABELS } from '../../constants/matchmaking'
 import { BOOL_FILTER_OPTIONS } from '../../constants/proposalFilters'
+import ProposalStatusFilters from './ProposalStatusFilters'
 
 function FilterSelect({ label, value, onChange, children, className = '' }) {
   return (
@@ -35,10 +36,17 @@ function FilterDate({ label, value, onChange }) {
 }
 
 export default function ProposalOpportunitiesFilterBar({
+  conferenceKey,
+  onConferenceChange,
+  conferences = [],
+  selectedConference,
   sector,
   onSectorChange,
   mouStatus,
   onMouStatusChange,
+  cooperationMode,
+  onCooperationModeChange,
+  cooperationModeFilters = [],
   hasMou,
   onHasMouChange,
   hasPitch,
@@ -56,6 +64,57 @@ export default function ProposalOpportunitiesFilterBar({
 }) {
   return (
     <div className="border-b border-slate-100 bg-green-50/40 px-4 py-4 sm:px-6">
+      {conferences.length > 0 && (
+        <div className="mb-4 border-b border-green-100 pb-4">
+          <FilterSelect
+            label="Conference"
+            value={conferenceKey}
+            onChange={onConferenceChange}
+            className="max-w-full lg:max-w-2xl"
+          >
+            <option value="">All conferences</option>
+            {conferences.map((c) => (
+              <option key={c.key} value={c.key} title={c.name}>
+                {c.name}
+                {c.proposal_count != null ? ` (${c.proposal_count})` : ''}
+              </option>
+            ))}
+          </FilterSelect>
+          {selectedConference && (
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              {selectedConference.mou_count != null && (
+                <span className="rounded-full bg-green-100 px-2.5 py-0.5 font-semibold text-green-800 ring-1 ring-green-200">
+                  {selectedConference.mou_count} MoU
+                </span>
+              )}
+              {selectedConference.jv_count != null && (
+                <span className="rounded-full bg-blue-100 px-2.5 py-0.5 font-semibold text-blue-800 ring-1 ring-blue-200">
+                  {selectedConference.jv_count} JV
+                </span>
+              )}
+              {selectedConference.agreement_count != null && (
+                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 font-semibold text-amber-900 ring-1 ring-amber-200">
+                  {selectedConference.agreement_count} Agreement
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {cooperationModeFilters.length > 0 && (
+        <div className="mb-4 border-b border-green-100 pb-4">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Cooperation mode
+          </p>
+          <ProposalStatusFilters
+            filters={cooperationModeFilters}
+            value={cooperationMode}
+            onChange={onCooperationModeChange}
+          />
+        </div>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
         <FilterSelect label="Sector" value={sector} onChange={onSectorChange}>
           <option value="">All sectors</option>

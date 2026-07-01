@@ -210,6 +210,9 @@ export default function DashboardLayout({ title }) {
               <NavLink to="/admin/users" className={navLinkClass}>
                 Users
               </NavLink>
+              <NavLink to="/admin/sectors" className={navLinkClass}>
+                Sectors
+              </NavLink>
               <NavLink
                 to="/dashboard/super-admin/sector-lead/handoff"
                 className={navLinkClass}
@@ -321,12 +324,20 @@ export default function DashboardLayout({ title }) {
               Complaints
             </NavLink>
             {isSuperAdmin && (
+              <>
               <NavLink
                 to="/admin/users"
                 className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
               >
                 Users
               </NavLink>
+              <NavLink
+                to="/admin/sectors"
+                className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
+              >
+                Sectors
+              </NavLink>
+              </>
             )}
             <NavLink
               to="/auth/change-password"

@@ -4,10 +4,11 @@ import * as adminSlApi from '../../api/adminSectorLead'
 import * as usersApi from '../../api/users'
 import Alert from '../../components/Alert'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { SECTORS } from '../../constants/sectors'
+import { useSectors } from '../../context/SectorsContext'
 import { getErrorMessage } from '../../utils/format'
 
 export default function SectorLeadReassign() {
+  const { sectors } = useSectors()
   const [sector, setSector] = useState('')
   const [sectorLeads, setSectorLeads] = useState([])
   const [loadingLeads, setLoadingLeads] = useState(false)
@@ -99,7 +100,7 @@ export default function SectorLeadReassign() {
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
           >
             <option value="">Select sector…</option>
-            {SECTORS.map((s) => (
+            {sectors.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>

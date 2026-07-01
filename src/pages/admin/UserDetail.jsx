@@ -7,7 +7,8 @@ import Modal from '../../components/Modal'
 import PartyBCredentialsModal from '../../components/PartyBCredentialsModal'
 import UserRoleBadge from '../../components/UserRoleBadge'
 import { useAuth } from '../../context/AuthContext'
-import { SECTORS, ROLES } from '../../constants/sectors'
+import { ROLES } from '../../constants/sectors'
+import { useSectors } from '../../context/SectorsContext'
 import { getPartyAProfilePaths } from '../../constants/profileRoutes'
 import { formatDate, getErrorMessage } from '../../utils/format'
 import {
@@ -29,6 +30,7 @@ export default function UserDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
+  const { sectors } = useSectors()
 
   const [user, setUser] = useState(null)
   const [roles, setRoles] = useState([])
@@ -360,7 +362,7 @@ export default function UserDetail() {
                   onChange={(e) => setEditForm((f) => ({ ...f, sector: e.target.value }))}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
-                  {SECTORS.map((s) => (
+                  {sectors.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
@@ -405,7 +407,7 @@ export default function UserDetail() {
                   onChange={(e) => setRoleForm((f) => ({ ...f, sector: e.target.value }))}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
-                  {SECTORS.map((s) => (
+                  {sectors.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>

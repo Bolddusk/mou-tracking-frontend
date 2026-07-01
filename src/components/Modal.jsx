@@ -11,6 +11,7 @@ export default function Modal({
   loading = false,
   confirmVariant = 'primary',
   hideFooter = false,
+  panelClassName = 'max-w-md',
 }) {
   if (!open) return null
 
@@ -27,7 +28,7 @@ export default function Modal({
         onClick={onClose}
         aria-label="Close modal backdrop"
       />
-      <div className="relative z-10 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+      <div className={`relative z-10 w-full rounded-xl bg-white p-6 shadow-xl ${panelClassName}`}>
         <h3 className="mb-4 text-lg font-semibold text-slate-800">{title}</h3>
         {children}
         {!hideFooter && (

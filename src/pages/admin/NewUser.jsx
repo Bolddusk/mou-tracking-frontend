@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import * as usersApi from '../../api/users'
 import Alert from '../../components/Alert'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { SECTORS } from '../../constants/sectors'
+import { useSectors } from '../../context/SectorsContext'
 import { getErrorMessage } from '../../utils/format'
 
 const EMPTY_FORM = {
@@ -11,12 +11,13 @@ const EMPTY_FORM = {
   email: '',
   password: '',
   role: 'party_a',
-  sector: SECTORS[0],
+  sector: '',
   organization: '',
   phone: '',
 }
 
 export default function NewUser() {
+  const { sectors } = useSectors()
   const navigate = useNavigate()
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -31,6 +32,12 @@ export default function NewUser() {
       .catch((err) => setError(getErrorMessage(err)))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (form.role === 'sector_lead' && !form.sector && sectors[0]) {
+      setForm((f) => ({ ...f, sector: sectors[0] }))
+    }
+  }, [form.role, form.sector, sectors])
 
   const selectedRole = useMemo(
     () => roles.find((r) => r.value === form.role),
@@ -145,7 +152,7 @@ export default function NewUser() {
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 required
               >
-                {SECTORS.map((s) => (
+                {sectors.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>

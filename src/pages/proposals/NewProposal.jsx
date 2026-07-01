@@ -20,13 +20,12 @@ import {
 import {
   MM_PROPOSAL_STEPS,
   MM_SIDES,
-  MM_SECTORS,
   MM_TOTAL_STEPS,
   defaultSideForRole,
   mmContentStep,
 } from '../../constants/matchmaking'
-import { SECTORS } from '../../constants/sectors'
 import { useAuth } from '../../context/AuthContext'
+import { useSectors } from '../../context/SectorsContext'
 import { getErrorMessage } from '../../utils/format'
 import * as mmDraft from '../../utils/mmProposalDraft'
 import { EMPTY_MM_PROPOSAL_FORM } from '../../utils/mmProposalDraft'
@@ -41,6 +40,7 @@ export default function NewProposal({ variant = 'legacy' }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user, isSuperAdmin, isPartyA, isInvestor } = useAuth()
+  const { sectors } = useSectors()
   const editProposalId = searchParams.get('edit')
   const initialStepParam = searchParams.get('step')
 
@@ -675,7 +675,7 @@ export default function NewProposal({ variant = 'legacy' }) {
                   label="Sector"
                   value={form.sector}
                   onChange={setField('sector')}
-                  options={isMm ? MM_SECTORS : SECTORS}
+                  options={sectors}
                 />
               </div>
             )}
@@ -882,7 +882,7 @@ export default function NewProposal({ variant = 'legacy' }) {
             <SectionTitle step={step} totalSteps={maxStep} title="Executive Summary" />
             {!isMm && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Select label="Key Sector" value={form.sector} onChange={setField('sector')} options={SECTORS} />
+              <Select label="Key Sector" value={form.sector} onChange={setField('sector')} options={sectors} />
               <Select label="Project Type" value={form.project_type} onChange={setField('project_type')} options={PROJECT_TYPES} />
             </div>
             )}
@@ -1004,7 +1004,7 @@ export default function NewProposal({ variant = 'legacy' }) {
             <SectionTitle step={step} totalSteps={maxStep} title="MOU" />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Scope" value={form.mou_scope} onChange={setField('mou_scope')} />
-              <Select label="Sector" value={form.mou_sector} onChange={setField('mou_sector')} options={SECTORS} />
+              <Select label="Sector" value={form.mou_sector} onChange={setField('mou_sector')} options={sectors} />
             </div>
             <Textarea label="Description" value={form.mou_description} onChange={setField('mou_description')} />
             <Textarea label="Demand" value={form.mou_demand} onChange={setField('mou_demand')} />
