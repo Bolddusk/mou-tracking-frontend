@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import * as mmApi from '../../api/matchmaking'
 import * as proposalsApi from '../../api/proposals'
 import Alert from '../Alert'
-import LoadingSpinner from '../LoadingSpinner'
 import { useAuth } from '../../context/AuthContext'
 import { getErrorMessage } from '../../utils/format'
 import MmMouStatusBadge from './MmMouStatusBadge'
@@ -96,6 +95,7 @@ export default function MouAcknowledgmentPanel({
   }, [load, refreshTrigger])
 
   const handleAck = async () => {
+    if (!status?.can_acknowledge) return
     setAcknowledging(true)
     setError('')
     setSuccess('')
@@ -122,11 +122,7 @@ export default function MouAcknowledgmentPanel({
   }
 
   if (loading) {
-    return (
-      <section className="flex min-h-[12vh] items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <LoadingSpinner />
-      </section>
-    )
+    return null
   }
 
   if (!status) {
@@ -135,6 +131,10 @@ export default function MouAcknowledgmentPanel({
         <Alert type="error" message={error} onClose={() => setError('')} />
       </section>
     ) : null
+  }
+
+  if (status.acknowledgment_required === false) {
+    return null
   }
 
   const versions = Array.isArray(status.versions) ? status.versions : []
@@ -150,8 +150,18 @@ export default function MouAcknowledgmentPanel({
   const isDealClosed = mouStatus === 'deal_closed'
   const isFullySigned = mouStatus === 'signed' || isDealClosed
 
-  const canAckPartyA = !isDealClosed && isPartyA && !partyAAck && hasCurrentFile
-  const canAckPartyB = !isDealClosed && (isPartyB || isInvestor) && !partyBAck && hasCurrentFile
+  const canAckPartyA =
+    status.can_acknowledge === true &&
+    !isDealClosed &&
+    isPartyA &&
+    !partyAAck &&
+    hasCurrentFile
+  const canAckPartyB =
+    status.can_acknowledge === true &&
+    !isDealClosed &&
+    (isPartyB || isInvestor) &&
+    !partyBAck &&
+    hasCurrentFile
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">

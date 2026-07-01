@@ -68,6 +68,38 @@ export function filterProposals(proposals, { status = '', search = '' } = {}) {
   return filterProposalsBySearch(filterProposalsByStatus(proposals, status), search)
 }
 
+export const BOOL_FILTER_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'true', label: 'Yes' },
+  { value: 'false', label: 'No' },
+]
+
+/** Build query params for GET /api/proposals/all (omit empty values). */
+export function buildProposalListParams({
+  status = '',
+  sector = '',
+  mou_status = '',
+  q = '',
+  date_from = '',
+  date_to = '',
+  has_mou = '',
+  has_pitch = '',
+  deal_closed = '',
+} = {}) {
+  const params = {}
+  if (status) params.status = status
+  if (sector) params.sector = sector
+  if (mou_status) params.mou_status = mou_status
+  const trimmedQ = q?.trim()
+  if (trimmedQ) params.q = trimmedQ
+  if (date_from) params.date_from = date_from
+  if (date_to) params.date_to = date_to
+  if (has_mou === 'true' || has_mou === 'false') params.has_mou = has_mou
+  if (has_pitch === 'true' || has_pitch === 'false') params.has_pitch = has_pitch
+  if (deal_closed === 'true' || deal_closed === 'false') params.deal_closed = deal_closed
+  return params
+}
+
 export function getProposalListEmptyMessage({
   totalCount = 0,
   statusFilter = '',

@@ -214,13 +214,13 @@ export default function DashboardLayout({ title }) {
                 to="/dashboard/super-admin/sector-lead/handoff"
                 className={navLinkClass}
               >
-                Sector Lead Handoff
+                Sector Officer Change
               </NavLink>
               <NavLink
                 to="/dashboard/super-admin/compliance"
                 className={navLinkClass}
               >
-                Compliance Filings
+                Audit &amp; Annual Returns
               </NavLink>
             </>
           )}

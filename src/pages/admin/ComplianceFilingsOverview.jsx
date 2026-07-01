@@ -50,9 +50,9 @@ export default function ComplianceFilingsOverview() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-slate-800">Compliance Filings</h3>
+        <h3 className="text-lg font-semibold text-slate-800">Audit &amp; Annual Returns</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Audit reports and annual returns for Party A organizations — last{' '}
+          Company audit reports and annual returns — last{' '}
           {years.length || 3} calendar years
           {years.length > 0 && ` (${years.join(', ')})`}
         </p>

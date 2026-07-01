@@ -10,7 +10,7 @@ export default function ComplianceFilingDetail() {
         to="/dashboard/super-admin/compliance"
         className="text-sm font-medium text-green-700 hover:underline"
       >
-        ← Compliance filings
+        ← Audit &amp; annual returns
       </Link>
       <ComplianceFilingsPanel mode="admin" userId={Number(userId)} />
     </div>

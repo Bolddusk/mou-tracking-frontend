@@ -41,12 +41,14 @@ export default function MmMouPanel({
   const [filePreview, setFilePreview] = useState(null)
   const [markSigned, setMarkSigned] = useState(false)
   const [ackRefresh, setAckRefresh] = useState(0)
+  const [ackStatus, setAckStatus] = useState(null)
   const [currentVersion, setCurrentVersion] = useState(null)
   const [statusVersions, setStatusVersions] = useState([])
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
 
   const handleAckStatusLoaded = useCallback(
     (data) => {
+      setAckStatus(data)
       onStatusChange?.(data?.mou_status)
       setCurrentVersion(
         data?.current_version ??
@@ -203,7 +205,14 @@ export default function MmMouPanel({
                   }`}
             </p>
           </div>
-          <MmMouStatusBadge status={mouStatus} />
+          <div className="flex flex-wrap items-center gap-2">
+            <MmMouStatusBadge status={mouStatus} />
+            {ackStatus?.is_historic_mou && (
+              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-200">
+                Historic MOU — acknowledgment not required
+              </span>
+            )}
+          </div>
         </div>
 
         {isDealClosed && (mouData.deal_closed_at || mouData.deal_closed_by_name) && (

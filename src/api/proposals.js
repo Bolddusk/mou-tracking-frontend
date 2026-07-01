@@ -42,9 +42,16 @@ export async function getSectorLeadProposals(status) {
   return response.data
 }
 
-export async function getAllProposals(status) {
-  const params = status ? { status } : {}
-  const response = await client.get('/api/proposals/all', { params })
+/** @param {string|Record<string, string|boolean|undefined>} [params] */
+export async function getAllProposals(params) {
+  const resolved =
+    typeof params === 'string' ? (params ? { status: params } : {}) : params || {}
+  const response = await client.get('/api/proposals/all', { params: resolved })
+  return response.data
+}
+
+export async function getProposalFilterOptions() {
+  const response = await client.get('/api/proposals/filter-options')
   return response.data
 }
 

@@ -6,8 +6,8 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import { formatDate, getErrorMessage } from '../../utils/format'
 
 const TABS = [
-  { key: 'orphans', label: 'Orphans' },
-  { key: 'history', label: 'History' },
+  { key: 'orphans', label: 'Unassigned Cases' },
+  { key: 'history', label: 'Past Transfers' },
 ]
 
 export default function SectorLeadHandoff() {
@@ -71,16 +71,16 @@ export default function SectorLeadHandoff() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-slate-800">Sector Lead Handoff</h3>
+          <h3 className="text-lg font-semibold text-slate-800">Sector Officer Change</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Orphan records and reassignment audit history
+            Cases without an assigned officer, and records of past officer transfers
           </p>
         </div>
         <Link
           to="/dashboard/super-admin/sector-lead/reassign"
           className="text-sm font-medium text-portal-primary hover:underline"
         >
-          ← Reassign Sector Lead
+          + Transfer to New Officer
         </Link>
       </div>
 
@@ -88,13 +88,13 @@ export default function SectorLeadHandoff() {
 
       {totalOrphans > 0 && activeTab !== 'orphans' && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <strong>{totalOrphans} orphan record(s)</strong> need attention.{' '}
+          <strong>{totalOrphans} unassigned case(s)</strong> need attention.{' '}
           <button
             type="button"
             onClick={() => setTab('orphans')}
             className="font-semibold underline"
           >
-            View orphans
+            View unassigned cases
           </button>
         </div>
       )}
@@ -144,7 +144,7 @@ function OrphansTab({ orphans, loading, totalOrphans }) {
   }
 
   if (!orphans) {
-    return <p className="py-12 text-center text-slate-500">Unable to load orphan data.</p>
+    return <p className="py-12 text-center text-slate-500">Unable to load unassigned cases.</p>
   }
 
   const complaints = orphans.orphan_complaints || []
@@ -155,27 +155,27 @@ function OrphansTab({ orphans, loading, totalOrphans }) {
       {totalOrphans > 0 ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-900">
           <p className="font-semibold">
-            {totalOrphans} orphan record(s) found — tagged to a missing or invalid Sector Lead.
+            {totalOrphans} unassigned case(s) found — no valid sector officer is linked.
           </p>
           <p className="mt-1">
-            Reassign the affected sector before deleting users.{' '}
+            Transfer these cases to a new officer before deleting users.{' '}
             <Link
               to="/dashboard/super-admin/sector-lead/reassign"
               className="font-semibold text-red-800 underline"
             >
-              Go to Reassign →
+              Transfer now →
             </Link>
           </p>
         </div>
       ) : (
         <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-800">
-          No orphan complaints or China proposals — all Sector Lead references are valid.
+          All complaints and China proposals have a valid sector officer assigned.
         </div>
       )}
 
       <OrphanTable
-        title="Orphan Complaints"
-        emptyMessage="No orphan complaints."
+        title="Unassigned Complaints"
+        emptyMessage="No unassigned complaints."
         rows={complaints}
         columns={[
           { key: 'id', label: 'ID', render: (r) => `#${r.id}` },
@@ -195,8 +195,8 @@ function OrphansTab({ orphans, loading, totalOrphans }) {
       />
 
       <OrphanTable
-        title="Orphan China Proposals"
-        emptyMessage="No orphan China proposals."
+        title="Unassigned China Proposals"
+        emptyMessage="No unassigned China proposals."
         rows={china}
         columns={[
           { key: 'id', label: 'ID', render: (r) => `#${r.id}` },
@@ -271,11 +271,11 @@ function HistoryTab({ history, loading }) {
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 px-4 py-3 sm:px-6">
-        <h4 className="font-semibold text-slate-800">Reassignment History</h4>
+        <h4 className="font-semibold text-slate-800">Officer Transfer History</h4>
         <p className="text-xs text-slate-500">{history?.count ?? rows.length} total</p>
       </div>
       {rows.length === 0 ? (
-        <p className="py-12 text-center text-sm text-slate-400">No reassignments recorded yet.</p>
+        <p className="py-12 text-center text-sm text-slate-400">No officer transfers recorded yet.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-[900px] w-full text-left text-sm">

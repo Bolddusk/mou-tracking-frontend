@@ -67,17 +67,17 @@ export default function SectorLeadReassign() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-slate-800">Reassign Sector Lead</h3>
+          <h3 className="text-lg font-semibold text-slate-800">Transfer to New Officer</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Move open complaints and China matchmaking proposals to a new Sector Lead for the
-            selected sector. Direct MOUS proposals follow the sector string automatically.
+            When a sector officer leaves or changes, move their open complaints and China proposals
+            to the new officer for that sector.
           </p>
         </div>
         <Link
           to="/dashboard/super-admin/sector-lead/handoff"
           className="text-sm font-medium text-portal-primary hover:underline"
         >
-          Orphans &amp; History →
+          Unassigned cases &amp; history →
         </Link>
       </div>
 
@@ -168,15 +168,15 @@ export default function SectorLeadReassign() {
           className="inline-flex items-center gap-2 rounded-lg bg-portal-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-portal-primary-hover disabled:opacity-50"
         >
           {submitting && <LoadingSpinner size="sm" />}
-          {submitting ? 'Reassigning…' : 'Reassign Sector Lead'}
+          {submitting ? 'Transferring…' : 'Transfer Cases'}
         </button>
       </form>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        <p className="font-medium text-slate-700">What gets reassigned</p>
+        <p className="font-medium text-slate-700">What gets moved</p>
         <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
-          <li>Open complaints (not resolved/rejected) → new SL</li>
-          <li>Open China proposals (not approved/rejected) → new SL</li>
+          <li>Open complaints → new sector officer</li>
+          <li>Open China proposals → new sector officer</li>
           <li>Direct MOUS — no action needed (sector-based queue)</li>
         </ul>
       </div>
