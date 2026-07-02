@@ -9,11 +9,13 @@ import UserRoleBadge from '../../components/UserRoleBadge'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES } from '../../constants/sectors'
 import { useSectors } from '../../context/SectorsContext'
-import { getPartyAProfilePaths } from '../../constants/profileRoutes'
+import { getPartyAProfilePaths, getPartyBProfilePaths } from '../../constants/profileRoutes'
 import { formatDate, getErrorMessage } from '../../utils/format'
 import {
+  deleteOffersUnlink,
   formatReferencesSummary,
   formatStatsSummary,
+  formatUnlinkedSummary,
   hasPortalRecords,
 } from '../../utils/userStats'
 
@@ -47,11 +49,14 @@ export default function UserDetail() {
   const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' })
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteRefs, setDeleteRefs] = useState(null)
+  const [deleteUnlinkMode, setDeleteUnlinkMode] = useState(false)
+  const [deleteHint, setDeleteHint] = useState('')
   const [partyBCredentials, setPartyBCredentials] = useState(null)
   const [partyBCredentialsSubtitle, setPartyBCredentialsSubtitle] = useState('')
   const [slReassignBlock, setSlReassignBlock] = useState(null)
 
   const profilePaths = getPartyAProfilePaths(ROLES.SUPER_ADMIN)
+  const partyBProfilePaths = getPartyBProfilePaths(ROLES.SUPER_ADMIN)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -92,8 +97,10 @@ export default function UserDetail() {
   const userNeedsSector =
     user && ['sector_lead', 'regional_focal_point'].includes(user.role)
   const isSelf = Number(currentUser?.id) === Number(user?.id)
+  const isPartyB = user?.role === 'party_b'
   const hasRecords = hasPortalRecords(user?.stats)
-  const canDelete = user && !isSelf && !hasRecords
+  const canDelete = user && !isSelf && (!hasRecords || isPartyB)
+  const deleteWithUnlink = isPartyB || deleteUnlinkMode
 
   const handleUpdate = async () => {
     setActionLoading(true)
@@ -173,11 +180,24 @@ export default function UserDetail() {
   const handleDelete = async () => {
     setActionLoading(true)
     setError('')
-    setDeleteRefs(null)
     try {
-      await usersApi.deleteUser(id)
+      const res = await usersApi.deleteUser(id, {
+        unlinkReferences: deleteWithUnlink,
+      })
       setDeleteOpen(false)
-      navigate('/admin/users')
+      setDeleteRefs(null)
+      setDeleteUnlinkMode(false)
+      setDeleteHint('')
+      const unlinkedSummary = formatUnlinkedSummary(res.unlinked)
+      navigate('/admin/users', {
+        state: {
+          success:
+            res.message ||
+            (unlinkedSummary
+              ? `User deleted — ${unlinkedSummary} unlinked`
+              : 'User deleted'),
+        },
+      })
     } catch (err) {
       const data = err?.response?.data
       const refs = data?.references
@@ -193,15 +213,29 @@ export default function UserDetail() {
           sector: user?.sector,
         })
         setError('')
-      } else if (refs) {
-        setDeleteRefs(refs)
-        setError(getErrorMessage(err))
+      } else if (refs || deleteOffersUnlink(data)) {
+        if (refs) setDeleteRefs(refs)
+        if (deleteOffersUnlink(data)) {
+          setDeleteUnlinkMode(true)
+          setDeleteHint(data.hint || '')
+          setError('')
+        } else {
+          setError(getErrorMessage(err))
+        }
       } else {
+        setDeleteOpen(false)
         setError(getErrorMessage(err))
       }
     } finally {
       setActionLoading(false)
     }
+  }
+
+  const openDeleteModal = () => {
+    setDeleteRefs(null)
+    setDeleteUnlinkMode(isPartyB)
+    setDeleteHint('')
+    setDeleteOpen(true)
   }
 
   if (loading) {
@@ -262,6 +296,14 @@ export default function UserDetail() {
               View Party A Profile
             </Link>
           )}
+          {(user.role === ROLES.PARTY_B || user.role === ROLES.INVESTOR) && (
+            <Link
+              to={partyBProfilePaths.detail(user.id)}
+              className="rounded-lg bg-portal-primary px-4 py-2 text-sm font-semibold text-white hover:bg-portal-primary-hover"
+            >
+              View Party B Profile
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => setEditOpen(true)}
@@ -295,17 +337,16 @@ export default function UserDetail() {
           )}
           <button
             type="button"
-            onClick={() => {
-              setDeleteRefs(null)
-              setDeleteOpen(true)
-            }}
-            disabled={isSelf || hasRecords}
+            onClick={openDeleteModal}
+            disabled={isSelf || !canDelete}
             title={
               isSelf
                 ? 'Cannot delete your own account'
-                : hasRecords
-                  ? 'User has portal records'
-                  : 'Delete user'
+                : !canDelete
+                  ? 'User has portal records that cannot be unlinked'
+                  : isPartyB
+                    ? 'Delete Party B account and unlink portal access'
+                    : 'Delete user'
             }
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -320,8 +361,9 @@ export default function UserDetail() {
             <h2 className="text-lg font-semibold text-slate-800">Activity Summary</h2>
             {hasRecords && (
               <p className="mt-1 text-xs text-amber-700">
-                This user has portal records — delete is blocked until records are reassigned or
-                archived.
+                {isPartyB
+                  ? 'This user is linked to portal records. You can delete the account and unlink portal access while keeping proposal and MOU data.'
+                  : 'This user has portal records — delete is blocked until records are reassigned or archived.'}
               </p>
             )}
           </div>
@@ -456,23 +498,50 @@ export default function UserDetail() {
 
       <Modal
         open={deleteOpen}
-        title="Delete User?"
-        onClose={() => setDeleteOpen(false)}
+        title={deleteWithUnlink ? 'Delete & unlink portal access?' : 'Delete User?'}
+        onClose={() => {
+          setDeleteOpen(false)
+          setDeleteRefs(null)
+          setDeleteUnlinkMode(false)
+          setDeleteHint('')
+        }}
         onConfirm={handleDelete}
-        confirmLabel="Delete"
+        confirmLabel={deleteWithUnlink ? 'Delete & unlink' : 'Delete'}
         confirmVariant="danger"
         loading={actionLoading}
-        confirmDisabled={!canDelete}
+        confirmDisabled={!(canDelete || deleteUnlinkMode)}
       >
-        {hasRecords ? (
+        {deleteWithUnlink ? (
+          <div className="space-y-3 text-sm text-slate-600">
+            <p>
+              Permanently delete <strong>{user.full_name}</strong> ({user.email}) and remove portal
+              links from linked records.
+            </p>
+            <p>
+              Proposal records stay on file — Party B name, email, and MOU data are not removed.
+              Only the login account and Party B profile are deleted.
+            </p>
+            {deleteRefs && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
+                Portal links to remove: {formatReferencesSummary(deleteRefs)}.
+              </p>
+            )}
+            {deleteHint && (
+              <p className="text-xs text-slate-500">{deleteHint}</p>
+            )}
+          </div>
+        ) : hasRecords ? (
           <p className="text-sm text-slate-600">
             Cannot delete <strong>{user.full_name}</strong> — linked to{' '}
             {formatStatsSummary(user.stats)}.
           </p>
         ) : deleteRefs ? (
-          <p className="text-sm text-red-700">
-            Delete blocked: {formatReferencesSummary(deleteRefs)}.
-          </p>
+          <div className="space-y-2 text-sm text-slate-600">
+            <p className="text-red-700">
+              Delete blocked: {formatReferencesSummary(deleteRefs)}.
+            </p>
+            {deleteHint && <p className="text-xs text-slate-500">{deleteHint}</p>}
+          </div>
         ) : (
           <p className="text-sm text-slate-600">
             Permanently delete <strong>{user.full_name}</strong> ({user.email})? This cannot be
@@ -509,7 +578,7 @@ export default function UserDetail() {
           <Link
             to={
               slReassignBlock?.sector
-                ? `/dashboard/super-admin/sector-lead/reassign`
+                ? `/admin/settings/sector-officer/reassign`
                 : '/dashboard/super-admin/sector-lead/handoff'
             }
             onClick={() => setSlReassignBlock(null)}

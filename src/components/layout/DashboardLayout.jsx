@@ -3,6 +3,11 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { PORTAL_SHORT } from '../../constants/branding'
 import { ROLE_LABELS } from '../../constants/sectors'
+import {
+  flattenNavigation,
+  isMatchmakingNavPath,
+  enrichNavigation,
+} from '../../utils/rbac'
 
 function looksLikePlaceholderName(name) {
   if (!name) return true
@@ -41,10 +46,176 @@ const mmNavLinkClass = ({ isActive }) =>
       : 'text-green-100/80 hover:bg-sidebar-hover hover:text-white'
   }`
 
+function sectionHeaderClass(sectionName) {
+  const upper = String(sectionName || '').toUpperCase()
+  if (upper.includes('MATCHMAKING')) {
+    return 'mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/90'
+  }
+  if (upper.includes('ADMINISTRATION') || upper.includes('SUPPORT')) {
+    return 'mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/70'
+  }
+  return 'px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/80'
+}
+
+function RbacSidebarNav({ navigation }) {
+  return navigation.map((section, index) => (
+    <div key={section.section || `section-${index}`}>
+      {section.section && <p className={sectionHeaderClass(section.section)}>{section.section}</p>}
+      {(section.items || []).map((item) => {
+        if (!item.path) return null
+        const linkClass = isMatchmakingNavPath(item.path) ? mmNavLinkClass : navLinkClass
+        return (
+          <NavLink
+            key={`${section.section || 'section'}-${item.key || item.path}`}
+            to={item.path}
+            end={item.end}
+            className={linkClass}
+          >
+            {item.label}
+          </NavLink>
+        )
+      })}
+    </div>
+  ))
+}
+
+function LegacySidebarNav({
+  dashboardPath,
+  isSuperAdmin,
+  isPartyA,
+  isPartyB,
+  isSectorLead,
+  isInvestor,
+  isFocalPoint,
+  isRegionalFocalPoint,
+}) {
+  return (
+    <>
+      {isSuperAdmin ? (
+        <>
+          <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/80">
+            Super Admin
+          </p>
+          <NavLink to="/dashboard/super-admin" end className={navLinkClass}>
+            All Opportunities
+          </NavLink>
+          <NavLink to="/proposals/new" className={navLinkClass}>
+            MOUS
+          </NavLink>
+          <p className="mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/90">
+            Matchmaking Oversight
+          </p>
+          <NavLink to="/matchmaking/admin/my-proposals" end className={mmNavLinkClass}>
+            All Proposals
+          </NavLink>
+          <NavLink to="/matchmaking/new" className={mmNavLinkClass}>
+            New Proposal
+          </NavLink>
+          <NavLink to="/matchmaking/admin/focal-point" end className={mmNavLinkClass}>
+            Review Queue
+          </NavLink>
+          <NavLink to="/matchmaking/admin/forwarded" end className={mmNavLinkClass}>
+            Forwarded
+          </NavLink>
+          <NavLink to="/matchmaking/admin/board" className={mmNavLinkClass}>
+            Matching Board
+          </NavLink>
+          <NavLink to="/matchmaking/admin/matches" end className={mmNavLinkClass}>
+            All Matches
+          </NavLink>
+        </>
+      ) : (
+        <>
+          <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/80">
+            Direct Opportunities
+          </p>
+          <NavLink to={dashboardPath} end className={navLinkClass}>
+            Dashboard
+          </NavLink>
+        </>
+      )}
+      {isPartyA && (
+        <NavLink to="/proposals/new" className={navLinkClass} title="Direct — partner + MOU ready">
+          Direct MOUS
+        </NavLink>
+      )}
+      {(isPartyA || isInvestor) && (
+        <>
+          <p className="mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/90">
+            Matchmaking
+          </p>
+          <NavLink to="/matchmaking/my-proposals" end className={mmNavLinkClass}>
+            My Proposals
+          </NavLink>
+          <NavLink to="/matchmaking/new" className={mmNavLinkClass}>
+            New Proposal
+          </NavLink>
+        </>
+      )}
+      {(isFocalPoint || isRegionalFocalPoint) && (
+        <>
+          <p className="mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/90">
+            Matchmaking Review
+          </p>
+          <NavLink to="/matchmaking/focal-point" end className={mmNavLinkClass}>
+            Review Queue
+          </NavLink>
+        </>
+      )}
+      {isSectorLead && (
+        <>
+          <p className="mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/90">
+            Matchmaking Review
+          </p>
+          <NavLink to="/matchmaking/forwarded" end className={mmNavLinkClass}>
+            Forwarded to Me
+          </NavLink>
+          <NavLink to="/matchmaking/board" className={mmNavLinkClass}>
+            Matching Board
+          </NavLink>
+          <NavLink to="/matchmaking/matches" end className={mmNavLinkClass}>
+            Matches
+          </NavLink>
+        </>
+      )}
+      <p className="mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/70">
+        {isSuperAdmin ? 'Administration' : 'Support'}
+      </p>
+      <NavLink to="/complaints" className={navLinkClass}>
+        {isSuperAdmin ? 'All Complaints' : 'Complaints'}
+      </NavLink>
+      {isSuperAdmin && (
+        <>
+          <NavLink to="/admin/users" className={navLinkClass}>
+            Users
+          </NavLink>
+          <NavLink to="/admin/permissions" className={navLinkClass}>
+            Permissions
+          </NavLink>
+          <NavLink to="/admin/sectors" className={navLinkClass}>
+            Sectors
+          </NavLink>
+          <NavLink to="/dashboard/super-admin/sector-lead/handoff" className={navLinkClass}>
+            Sector Officer Change
+          </NavLink>
+          <NavLink to="/dashboard/super-admin/compliance" className={navLinkClass}>
+            Audit &amp; Annual Returns
+          </NavLink>
+        </>
+      )}
+      <NavLink to="/auth/change-password" className={navLinkClass}>
+        Change Password
+      </NavLink>
+    </>
+  )
+}
+
 export default function DashboardLayout({ title }) {
   const {
     user,
+    rbac,
     logout,
+    dashboardPath,
     isPartyA,
     isPartyB,
     isSectorLead,
@@ -55,37 +226,42 @@ export default function DashboardLayout({ title }) {
   } = useAuth()
   const navigate = useNavigate()
 
-  const dashboardPath = isPartyA
-    ? '/dashboard/party-a'
-    : isPartyB
-      ? '/dashboard/party-b'
-      : isSectorLead
-        ? '/dashboard/sector-lead'
-        : isSuperAdmin
-          ? '/dashboard/super-admin'
-          : isRegionalFocalPoint
-            ? '/dashboard/regional-focal'
-            : isInvestor
-              ? '/matchmaking/my-proposals'
-              : isFocalPoint
-                ? '/matchmaking/focal-point'
-                : '/auth/login'
+  const navigation = useMemo(
+    () => enrichNavigation(rbac?.navigation, rbac),
+    [rbac],
+  )
+  const useRbacNav = navigation.length > 0
+  const mobileNavItems = useMemo(() => flattenNavigation(navigation).slice(0, 8), [navigation])
 
-  const footerLabel = isPartyA
-    ? 'Party A — Opportunity Submission'
-    : isPartyB
-      ? 'Party B — Invited Proposals'
-      : isSectorLead
-        ? `Sector Lead — ${user?.sector || 'Review'}`
-        : isSuperAdmin
-          ? 'Super Admin — All Sectors'
-          : isRegionalFocalPoint
-            ? `Regional Focal — ${user?.sector || 'Complaints'}`
-            : isInvestor
-              ? 'Investor — Matchmaking'
-              : isFocalPoint
-                ? `Focal Point — ${user?.sector || 'Review'}`
-                : PORTAL_SHORT
+  const scopedSector = rbac?.context?.scoped_sector || rbac?.context?.sector || user?.sector
+  const roleLabel = rbac?.role_label || ROLE_LABELS[user?.role] || user?.role
+
+  const footerLabel = useMemo(() => {
+    if (useRbacNav && scopedSector) return `${roleLabel} — ${scopedSector}`
+    if (useRbacNav && rbac?.context?.country) return `${roleLabel} — ${rbac.context.country}`
+    if (useRbacNav) return roleLabel || PORTAL_SHORT
+    if (isPartyA) return 'Party A — Opportunity Submission'
+    if (isPartyB) return 'Party B — Invited Proposals'
+    if (isSectorLead) return `Sector Lead — ${user?.sector || 'Review'}`
+    if (isSuperAdmin) return 'Super Admin — All Sectors'
+    if (isRegionalFocalPoint) return `Regional Focal — ${user?.sector || 'Complaints'}`
+    if (isInvestor) return 'Investor — Matchmaking'
+    if (isFocalPoint) return `Focal Point — ${user?.sector || 'Review'}`
+    return PORTAL_SHORT
+  }, [
+    useRbacNav,
+    scopedSector,
+    roleLabel,
+    rbac?.context?.country,
+    isPartyA,
+    isPartyB,
+    isSectorLead,
+    isSuperAdmin,
+    isRegionalFocalPoint,
+    isInvestor,
+    isFocalPoint,
+    user?.sector,
+  ])
 
   const handleLogout = () => {
     logout()
@@ -108,131 +284,38 @@ export default function DashboardLayout({ title }) {
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {isSuperAdmin ? (
-            <>
-              <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/80">
-                Super Admin
-              </p>
-              <NavLink to="/dashboard/super-admin" end className={navLinkClass}>
-                All Opportunities
-              </NavLink>
-              <NavLink to="/proposals/new" className={navLinkClass}>
-                MOUS
-              </NavLink>
-              <p className="mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/90">
-                Matchmaking Oversight
-              </p>
-              <NavLink to="/matchmaking/admin/my-proposals" end className={mmNavLinkClass}>
-                All Proposals
-              </NavLink>
-              <NavLink to="/matchmaking/new" className={mmNavLinkClass}>
-                New Proposal
-              </NavLink>
-              <NavLink to="/matchmaking/admin/focal-point" end className={mmNavLinkClass}>
-                Review Queue
-              </NavLink>
-              <NavLink to="/matchmaking/admin/forwarded" end className={mmNavLinkClass}>
-                Forwarded
-              </NavLink>
-              <NavLink to="/matchmaking/admin/board" className={mmNavLinkClass}>
-                Matching Board
-              </NavLink>
-              <NavLink to="/matchmaking/admin/matches" end className={mmNavLinkClass}>
-                All Matches
-              </NavLink>
-            </>
+          {useRbacNav ? (
+            <RbacSidebarNav navigation={navigation} />
           ) : (
-            <>
-              <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/80">
-                Direct Opportunities
-              </p>
-              <NavLink to={dashboardPath} end className={navLinkClass}>
-                Dashboard
-              </NavLink>
-            </>
+            <LegacySidebarNav
+              dashboardPath={dashboardPath}
+              isSuperAdmin={isSuperAdmin}
+              isPartyA={isPartyA}
+              isPartyB={isPartyB}
+              isSectorLead={isSectorLead}
+              isInvestor={isInvestor}
+              isFocalPoint={isFocalPoint}
+              isRegionalFocalPoint={isRegionalFocalPoint}
+            />
           )}
-          {isPartyA && (
-            <NavLink to="/proposals/new" className={navLinkClass} title="Direct — partner + MOU ready">
-              Direct MOUS
-            </NavLink>
-          )}
-
-          {(isPartyA || isInvestor) && (
-            <>
-              <p className="mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/90">
-                Matchmaking
-              </p>
-              <NavLink to="/matchmaking/my-proposals" end className={mmNavLinkClass}>
-                My Proposals
-              </NavLink>
-              <NavLink to="/matchmaking/new" className={mmNavLinkClass}>
-                New Proposal
-              </NavLink>
-            </>
-          )}
-
-          {(isFocalPoint || isRegionalFocalPoint) && (
-            <>
-              <p className="mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/90">
-                Matchmaking Review
-              </p>
-              <NavLink to="/matchmaking/focal-point" end className={mmNavLinkClass}>
-                Review Queue
-              </NavLink>
-            </>
-          )}
-
-          {isSectorLead && (
-            <>
-              <p className="mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/90">
-                Matchmaking Review
-              </p>
-              <NavLink to="/matchmaking/forwarded" end className={mmNavLinkClass}>
-                Forwarded to Me
-              </NavLink>
-              <NavLink to="/matchmaking/board" className={mmNavLinkClass}>
-                Matching Board
-              </NavLink>
-              <NavLink to="/matchmaking/matches" end className={mmNavLinkClass}>
-                Matches
-              </NavLink>
-            </>
-          )}
-
-          <p className="mt-4 px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-green-300/70">
-            {isSuperAdmin ? 'Administration' : 'Support'}
-          </p>
-          <NavLink to="/complaints" className={navLinkClass}>
-            {isSuperAdmin ? 'All Complaints' : 'Complaints'}
-          </NavLink>
-          {isSuperAdmin && (
-            <>
-              <NavLink to="/admin/users" className={navLinkClass}>
-                Users
-              </NavLink>
-              <NavLink to="/admin/sectors" className={navLinkClass}>
-                Sectors
-              </NavLink>
-              <NavLink
-                to="/dashboard/super-admin/sector-lead/handoff"
-                className={navLinkClass}
-              >
-                Sector Officer Change
-              </NavLink>
-              <NavLink
-                to="/dashboard/super-admin/compliance"
-                className={navLinkClass}
-              >
-                Audit &amp; Annual Returns
-              </NavLink>
-            </>
-          )}
-          <NavLink to="/auth/change-password" className={navLinkClass}>
-            Change Password
-          </NavLink>
         </nav>
 
         <div className="border-t border-white/10 px-4 py-4">
+          {(isPartyB || isInvestor) && (
+            <NavLink
+              to="/dashboard/party-b/profile"
+              className={({ isActive }) =>
+                `mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-white/15 text-green-100'
+                    : 'text-green-100/90 hover:bg-sidebar-hover hover:text-white'
+                }`
+              }
+            >
+              <BuildingIcon className="h-4 w-4 shrink-0 opacity-90" />
+              Company Profile
+            </NavLink>
+          )}
           {isPartyA && (
             <NavLink
               to="/dashboard/party-a/profile"
@@ -254,97 +337,118 @@ export default function DashboardLayout({ title }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 border-b border-green-100 bg-white px-4 py-3 shadow-sm sm:px-6">
-          <div className="mb-2 flex gap-2 lg:hidden">
-            <NavLink
-              to={dashboardPath}
-              className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
-            >
-              Dashboard
-            </NavLink>
-            {(isPartyA || isSuperAdmin) && (
-              <NavLink
-                to="/proposals/new"
-                className="rounded-lg bg-portal-primary/20 px-3 py-1.5 text-xs font-medium text-green-800"
-              >
-                MOUS
-              </NavLink>
-            )}
-            {(isPartyA || isInvestor) && (
-              <NavLink
-                to="/matchmaking/my-proposals"
-                className="rounded-lg bg-green-600/15 px-3 py-1.5 text-xs font-medium text-green-800"
-              >
-                MM
-              </NavLink>
-            )}
-            {isSectorLead && (
+          <div className="mb-2 flex flex-wrap gap-2 lg:hidden">
+            {useRbacNav ? (
+              mobileNavItems.map((item) => (
+                <NavLink
+                  key={item.key || item.path}
+                  to={item.path}
+                  end={item.end}
+                  className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
+                >
+                  {item.label}
+                </NavLink>
+              ))
+            ) : (
               <>
                 <NavLink
-                  to="/matchmaking/focal-point"
-                  className="rounded-lg bg-green-600/15 px-3 py-1.5 text-xs font-medium text-green-800"
+                  to={dashboardPath}
+                  className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
                 >
-                  Queue
+                  Dashboard
                 </NavLink>
+                {(isPartyA || isSuperAdmin) && (
+                  <NavLink
+                    to="/proposals/new"
+                    className="rounded-lg bg-portal-primary/20 px-3 py-1.5 text-xs font-medium text-green-800"
+                  >
+                    MOUS
+                  </NavLink>
+                )}
+                {(isPartyA || isInvestor) && (
+                  <NavLink
+                    to="/matchmaking/my-proposals"
+                    className="rounded-lg bg-green-600/15 px-3 py-1.5 text-xs font-medium text-green-800"
+                  >
+                    MM
+                  </NavLink>
+                )}
+                {isSectorLead && (
+                  <>
+                    <NavLink
+                      to="/matchmaking/forwarded"
+                      className="rounded-lg bg-green-600/15 px-3 py-1.5 text-xs font-medium text-green-800"
+                    >
+                      Forwarded
+                    </NavLink>
+                    <NavLink
+                      to="/matchmaking/board"
+                      className="rounded-lg bg-green-600/15 px-3 py-1.5 text-xs font-medium text-green-800"
+                    >
+                      Board
+                    </NavLink>
+                  </>
+                )}
+                {isSuperAdmin && (
+                  <>
+                    <NavLink
+                      to="/dashboard/super-admin"
+                      className="rounded-lg bg-green-100 px-3 py-1.5 text-xs font-medium text-green-800"
+                    >
+                      Opportunities
+                    </NavLink>
+                    <NavLink
+                      to="/matchmaking/admin/my-proposals"
+                      className="rounded-lg bg-green-600/15 px-3 py-1.5 text-xs font-medium text-green-800"
+                    >
+                      MM
+                    </NavLink>
+                  </>
+                )}
+                {(isFocalPoint || isRegionalFocalPoint) && (
+                  <NavLink
+                    to="/matchmaking/focal-point"
+                    className="rounded-lg bg-green-600/15 px-3 py-1.5 text-xs font-medium text-green-800"
+                  >
+                    Queue
+                  </NavLink>
+                )}
                 <NavLink
-                  to="/matchmaking/board"
-                  className="rounded-lg bg-green-600/15 px-3 py-1.5 text-xs font-medium text-green-800"
+                  to="/complaints"
+                  className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
                 >
-                  Board
+                  Complaints
+                </NavLink>
+                {isSuperAdmin && (
+                  <>
+                    <NavLink
+                      to="/admin/users"
+                      className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
+                    >
+                      Users
+                    </NavLink>
+                    <NavLink
+                      to="/admin/permissions"
+                      className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
+                    >
+                      Permissions
+                    </NavLink>
+                    <NavLink
+                      to="/admin/sectors"
+                      className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
+                    >
+                      Sectors
+                    </NavLink>
+                  </>
+                )}
+                <NavLink
+                  to="/auth/change-password"
+                  className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
+                >
+                  Password
                 </NavLink>
               </>
             )}
-            {isSuperAdmin && (
-              <>
-                <NavLink
-                  to="/dashboard/super-admin"
-                  className="rounded-lg bg-green-100 px-3 py-1.5 text-xs font-medium text-green-800"
-                >
-                  Opportunities
-                </NavLink>
-                <NavLink
-                  to="/matchmaking/admin/my-proposals"
-                  className="rounded-lg bg-green-600/15 px-3 py-1.5 text-xs font-medium text-green-800"
-                >
-                  MM
-                </NavLink>
-              </>
-            )}
-            {(isFocalPoint || isRegionalFocalPoint) && (
-              <NavLink
-                to="/matchmaking/focal-point"
-                className="rounded-lg bg-green-600/15 px-3 py-1.5 text-xs font-medium text-green-800"
-              >
-                Queue
-              </NavLink>
-            )}
-            <NavLink
-              to="/complaints"
-              className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
-            >
-              Complaints
-            </NavLink>
-            {isSuperAdmin && (
-              <>
-              <NavLink
-                to="/admin/users"
-                className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
-              >
-                Users
-              </NavLink>
-              <NavLink
-                to="/admin/sectors"
-                className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
-              >
-                Sectors
-              </NavLink>
-              </>
-            )}
-            <NavLink
-              to="/auth/change-password"
-              className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
-            >
-              Password
-            </NavLink>
           </div>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-800 sm:text-xl">{title}</h2>
@@ -353,6 +457,7 @@ export default function DashboardLayout({ title }) {
               displayName={displayName}
               isPartyA={isPartyA}
               isPartyB={isPartyB}
+              isInvestor={isInvestor}
               onLogout={handleLogout}
             />
           </div>
@@ -366,7 +471,7 @@ export default function DashboardLayout({ title }) {
   )
 }
 
-function UserAccountMenu({ user, displayName, isPartyA, isPartyB, onLogout }) {
+function UserAccountMenu({ user, displayName, isPartyA, isPartyB, isInvestor, onLogout }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
 
@@ -437,6 +542,18 @@ function UserAccountMenu({ user, displayName, isPartyA, isPartyB, onLogout }) {
             <ProfileIcon className="h-4 w-4 text-slate-500" />
             My Profile
           </Link>
+
+          {(isPartyB || isInvestor) && (
+            <Link
+              to="/dashboard/party-b/profile"
+              role="menuitem"
+              onClick={close}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <BuildingIcon className="h-4 w-4 text-slate-500" />
+              Company Profile
+            </Link>
+          )}
 
           {isPartyA && (
             <Link

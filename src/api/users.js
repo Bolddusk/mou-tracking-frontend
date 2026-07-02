@@ -60,7 +60,8 @@ export async function issuePartyBCredentials(id) {
   return response.data
 }
 
-export async function deleteUser(id) {
-  const response = await client.delete(`/api/users/${id}`)
+export async function deleteUser(id, { unlinkReferences = false } = {}) {
+  const params = unlinkReferences ? { unlink_references: true } : {}
+  const response = await client.delete(`/api/users/${id}`, { params })
   return response.data
 }

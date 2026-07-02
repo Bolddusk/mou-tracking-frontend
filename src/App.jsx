@@ -4,7 +4,12 @@ import { SectorsProvider } from './context/SectorsContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AuthLayout from './components/layout/AuthLayout'
 import DashboardLayout from './components/layout/DashboardLayout'
-import { ROLES } from './constants/sectors'
+import { ROUTE_ACCESS } from './constants/routePermissions'
+import AdminSettingsLayout, {
+  AdminSettingsDefaultRedirect,
+  AdminSettingsTab,
+} from './pages/admin/AdminSettingsLayout'
+import { ADMIN_SETTINGS_TABS } from './constants/adminSettings'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import ChangePassword from './pages/auth/ChangePassword'
@@ -13,6 +18,8 @@ import PartyADashboard from './pages/dashboard/PartyADashboard'
 import PartyAProfile from './pages/profile/PartyAProfile'
 import UserProfile from './pages/profile/UserProfile'
 import PartyAProfileView from './pages/profile/PartyAProfileView'
+import PartyBProfile from './pages/profile/PartyBProfile'
+import PartyBProfileView from './pages/profile/PartyBProfileView'
 import PartyBDashboard from './pages/dashboard/PartyBDashboard'
 import SectorLeadDashboard from './pages/dashboard/SectorLeadDashboard'
 import SuperAdminDashboard from './pages/dashboard/SuperAdminDashboard'
@@ -24,6 +31,7 @@ import ComplaintDetail from './pages/complaints/ComplaintDetail'
 import UsersList from './pages/admin/UsersList'
 import NewUser from './pages/admin/NewUser'
 import UserDetail from './pages/admin/UserDetail'
+import PermissionsAdmin from './pages/admin/PermissionsAdmin'
 import SectorsAdmin from './pages/admin/SectorsAdmin'
 import SectorLeadReassign from './pages/admin/SectorLeadReassign'
 import SectorLeadHandoff from './pages/admin/SectorLeadHandoff'
@@ -38,44 +46,7 @@ import MmMatchingBoard from './pages/matchmaking/MmMatchingBoard'
 import MmMatchesDashboard from './pages/matchmaking/MmMatchesDashboard'
 import MmMatchDetail from './pages/matchmaking/MmMatchDetail'
 import MmEngagementMou from './pages/matchmaking/MmEngagementMou'
-
-const COMPLAINT_ROLES = [
-  ROLES.PARTY_A,
-  ROLES.PARTY_B,
-  ROLES.SECTOR_LEAD,
-  ROLES.SUPER_ADMIN,
-  ROLES.REGIONAL_FOCAL_POINT,
-]
-
-const PROPOSAL_DETAIL_ROLES = [
-  ROLES.PARTY_A,
-  ROLES.PARTY_B,
-  ROLES.INVESTOR,
-  ROLES.SECTOR_LEAD,
-  ROLES.SUPER_ADMIN,
-  ROLES.REGIONAL_FOCAL_POINT,
-  ROLES.FOCAL_POINT,
-]
-
-const MM_SUBMITTER_ROLES = [ROLES.PARTY_A, ROLES.INVESTOR, ROLES.SUPER_ADMIN]
-
-const MM_REVIEW_ROLES = [
-  ROLES.FOCAL_POINT,
-  ROLES.REGIONAL_FOCAL_POINT,
-  ROLES.SECTOR_LEAD,
-  ROLES.SUPER_ADMIN,
-]
-
-const MM_MATCHING_ROLES = [ROLES.SECTOR_LEAD, ROLES.SUPER_ADMIN]
-
-const MM_PROPOSAL_VIEW_ROLES = [
-  ROLES.PARTY_A,
-  ROLES.INVESTOR,
-  ROLES.FOCAL_POINT,
-  ROLES.REGIONAL_FOCAL_POINT,
-  ROLES.SECTOR_LEAD,
-  ROLES.SUPER_ADMIN,
-]
+import Unauthorized from './pages/Unauthorized'
 
 function HomeRedirect() {
   const { isAuthenticated, dashboardPath, mustChangePassword } = useAuth()
@@ -86,17 +57,9 @@ function HomeRedirect() {
   return <Navigate to="/auth/login" replace />
 }
 
-function RoleShell({ title, allowedRole }) {
+function PermissionShell({ title, permissions }) {
   return (
-    <ProtectedRoute allowedRole={allowedRole}>
-      <DashboardLayout title={title} />
-    </ProtectedRoute>
-  )
-}
-
-function MultiRoleShell({ title, allowedRoles }) {
-  return (
-    <ProtectedRoute allowedRoles={allowedRoles}>
+    <ProtectedRoute permissions={permissions}>
       <DashboardLayout title={title} />
     </ProtectedRoute>
   )
@@ -125,6 +88,7 @@ export default function App() {
         <SectorsProvider>
         <Routes>
           <Route path="/" element={<HomeRedirect />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
 
           <Route path="/auth" element={<AuthLayout />}>
             <Route path="login" element={<Login />} />
@@ -136,21 +100,34 @@ export default function App() {
             <Route path="/profile" element={<UserProfile />} />
           </Route>
 
-          <Route element={<RoleShell title="Party A Dashboard" allowedRole={ROLES.PARTY_A} />}>
+          <Route
+            element={
+              <PermissionShell title="Party A Dashboard" permissions={ROUTE_ACCESS.partyADashboard} />
+            }
+          >
             <Route path="/dashboard/party-a" element={<PartyADashboard />} />
             <Route path="/dashboard/party-a/profile" element={<PartyAProfile />} />
           </Route>
 
-          <Route element={<RoleShell title="Party B Dashboard" allowedRole={ROLES.PARTY_B} />}>
+          <Route
+            element={
+              <PermissionShell title="Party B Dashboard" permissions={ROUTE_ACCESS.partyBDashboard} />
+            }
+          >
             <Route path="/dashboard/party-b" element={<PartyBDashboard />} />
           </Route>
 
           <Route
             element={
-              <MultiRoleShell
-                title="MOUS"
-                allowedRoles={[ROLES.PARTY_A, ROLES.SUPER_ADMIN]}
-              />
+              <PermissionShell title="Company Profile" permissions={ROUTE_ACCESS.partyBProfile} />
+            }
+          >
+            <Route path="/dashboard/party-b/profile" element={<PartyBProfile />} />
+          </Route>
+
+          <Route
+            element={
+              <PermissionShell title="MOUS" permissions={ROUTE_ACCESS.newDirectProposal} />
             }
           >
             <Route path="/proposals/new" element={<NewProposal />} />
@@ -158,50 +135,42 @@ export default function App() {
 
           <Route
             element={
-              <MultiRoleShell title="My Proposals" allowedRoles={[ROLES.PARTY_A, ROLES.INVESTOR]} />
+              <PermissionShell title="My Proposals" permissions={ROUTE_ACCESS.mmMyProposals} />
             }
           >
             <Route path="/matchmaking/my-proposals" element={<MmMyProposalsDashboard />} />
           </Route>
 
           <Route
-            element={
-              <MultiRoleShell title="New Proposal" allowedRoles={MM_SUBMITTER_ROLES} />
-            }
+            element={<PermissionShell title="New Proposal" permissions={ROUTE_ACCESS.mmNew} />}
           >
             <Route path="/matchmaking/new" element={<NewMmProposal />} />
           </Route>
 
           <Route
-            element={<MultiRoleShell title="Review Queue" allowedRoles={MM_REVIEW_ROLES} />}
+            element={
+              <PermissionShell title="Review Queue" permissions={ROUTE_ACCESS.mmReviewQueue} />
+            }
           >
             <Route path="/matchmaking/focal-point" element={<MmFocalPointDashboard />} />
           </Route>
 
           <Route
             element={
-              <MultiRoleShell
-                title="Forwarded to Me"
-                allowedRoles={[ROLES.SECTOR_LEAD, ROLES.SUPER_ADMIN]}
-              />
+              <PermissionShell title="Forwarded to Me" permissions={ROUTE_ACCESS.mmForwarded} />
             }
           >
             <Route path="/matchmaking/forwarded" element={<MmForwardedDashboard />} />
           </Route>
 
           <Route
-            element={<MultiRoleShell title="Matching Board" allowedRoles={MM_MATCHING_ROLES} />}
+            element={<PermissionShell title="Matching Board" permissions={ROUTE_ACCESS.mmBoard} />}
           >
             <Route path="/matchmaking/board" element={<MmMatchingBoard />} />
           </Route>
 
           <Route
-            element={
-              <MultiRoleShell
-                title="Matches"
-                allowedRoles={[ROLES.SECTOR_LEAD, ROLES.SUPER_ADMIN, ROLES.PARTY_A, ROLES.INVESTOR]}
-              />
-            }
+            element={<PermissionShell title="Matches" permissions={ROUTE_ACCESS.mmMatches} />}
           >
             <Route path="/matchmaking/matches" element={<MmMatchesDashboard />} />
             <Route path="/matchmaking/matches/:id" element={<MmMatchDetail />} />
@@ -209,49 +178,13 @@ export default function App() {
 
           <Route
             element={
-              <MultiRoleShell title="Proposal Detail" allowedRoles={MM_PROPOSAL_VIEW_ROLES} />
+              <PermissionShell
+                title="Matchmaking Oversight"
+                permissions={ROUTE_ACCESS.mmAllProposals}
+              />
             }
           >
-            <Route path="/matchmaking/:id" element={<MmProposalDetail />} />
-          </Route>
-
-          <Route element={<RoleShell title="Sector Lead Dashboard" allowedRole={ROLES.SECTOR_LEAD} />}>
-            <Route path="/dashboard/sector-lead" element={<SectorLeadDashboard />} />
-            <Route
-              path="/dashboard/sector-lead/party-a-profiles/:userId"
-              element={<PartyAProfileView />}
-            />
-          </Route>
-
-          <Route element={<RoleShell title="Super Admin Dashboard" allowedRole={ROLES.SUPER_ADMIN} />}>
-            <Route path="/dashboard/super-admin" element={<SuperAdminDashboard />} />
-            <Route
-              path="/dashboard/super-admin/party-a-profiles/:userId"
-              element={<PartyAProfileView />}
-            />
-            <Route
-              path="/dashboard/super-admin/sector-lead/reassign"
-              element={<SectorLeadReassign />}
-            />
-            <Route
-              path="/dashboard/super-admin/sector-lead/handoff"
-              element={<SectorLeadHandoff />}
-            />
-            <Route
-              path="/dashboard/super-admin/compliance"
-              element={<ComplianceFilingsOverview />}
-            />
-            <Route
-              path="/dashboard/super-admin/compliance/:userId"
-              element={<ComplianceFilingDetail />}
-            />
-          </Route>
-
-          <Route
-            element={
-              <RoleShell title="Super Admin — Matchmaking Oversight" allowedRole={ROLES.SUPER_ADMIN} />
-            }
-          >
+            <Route path="/matchmaking/all" element={<MmMyProposalsDashboard adminOversight />} />
             <Route
               path="/matchmaking/admin/my-proposals"
               element={<MmMyProposalsDashboard adminOversight />}
@@ -274,14 +207,66 @@ export default function App() {
           </Route>
 
           <Route
-            element={<RoleShell title="Focal Point Dashboard" allowedRole={ROLES.FOCAL_POINT} />}
+            element={
+              <PermissionShell title="Proposal Detail" permissions={ROUTE_ACCESS.mmProposalDetail} />
+            }
           >
-            <Route path="/dashboard/focal-point" element={<Navigate to="/matchmaking/focal-point" replace />} />
+            <Route path="/matchmaking/:id" element={<MmProposalDetail />} />
           </Route>
 
           <Route
             element={
-              <RoleShell title="Regional Focal Point" allowedRole={ROLES.REGIONAL_FOCAL_POINT} />
+              <PermissionShell
+                title="Sector Lead Dashboard"
+                permissions={ROUTE_ACCESS.sectorLeadDashboard}
+              />
+            }
+          >
+            <Route path="/dashboard/sector-lead" element={<SectorLeadDashboard />} />
+            <Route
+              path="/dashboard/sector-lead/party-a-profiles/:userId"
+              element={<PartyAProfileView />}
+            />
+            <Route
+              path="/dashboard/sector-lead/party-b-profiles/:userId"
+              element={<PartyBProfileView />}
+            />
+          </Route>
+
+          <Route
+            element={
+              <PermissionShell
+                title="Super Admin Dashboard"
+                permissions={ROUTE_ACCESS.superAdminDashboard}
+              />
+            }
+          >
+            <Route path="/dashboard/super-admin" element={<SuperAdminDashboard />} />
+            <Route path="/dashboard/super-admin/mous" element={<SuperAdminDashboard />} />
+            <Route
+              path="/dashboard/super-admin/party-a-profiles/:userId"
+              element={<PartyAProfileView />}
+            />
+            <Route
+              path="/dashboard/super-admin/party-b-profiles/:userId"
+              element={<PartyBProfileView />}
+            />
+          </Route>
+
+          <Route
+            element={
+              <PermissionShell title="Focal Point" permissions={ROUTE_ACCESS.mmReviewQueue} />
+            }
+          >
+            <Route
+              path="/dashboard/focal-point"
+              element={<Navigate to="/matchmaking/focal-point" replace />}
+            />
+          </Route>
+
+          <Route
+            element={
+              <PermissionShell title="Regional Focal Point" permissions={ROUTE_ACCESS.regionalFocal} />
             }
           >
             <Route path="/dashboard/regional-focal" element={<RegionalFocalDashboard />} />
@@ -289,10 +274,7 @@ export default function App() {
 
           <Route
             element={
-              <MultiRoleShell
-                title="Proposal Detail"
-                allowedRoles={PROPOSAL_DETAIL_ROLES}
-              />
+              <PermissionShell title="Proposal Detail" permissions={ROUTE_ACCESS.proposalDetail} />
             }
           >
             <Route path="/proposals/:id" element={<ProposalDetail />} />
@@ -300,41 +282,118 @@ export default function App() {
             <Route path="/matchmaking/matches/:id/mou" element={<MmEngagementMou />} />
           </Route>
 
-          <Route element={<MultiRoleShell title="Complaints" allowedRoles={COMPLAINT_ROLES} />}>
+          <Route element={<PermissionShell title="Complaints" permissions={ROUTE_ACCESS.complaints} />}>
             <Route path="/complaints" element={<ComplaintsList />} />
           </Route>
 
           <Route
             element={
-              <MultiRoleShell
-                title="File Complaint"
-                allowedRoles={[ROLES.PARTY_A, ROLES.PARTY_B]}
-              />
+              <PermissionShell title="File Complaint" permissions={ROUTE_ACCESS.complaintsNew} />
             }
           >
             <Route path="/complaints/new" element={<NewComplaint />} />
           </Route>
 
           <Route
-            element={<MultiRoleShell title="Complaint Detail" allowedRoles={COMPLAINT_ROLES} />}
+            element={
+              <PermissionShell title="Complaint Detail" permissions={ROUTE_ACCESS.complaints} />
+            }
           >
             <Route path="/complaints/:id" element={<ComplaintDetail />} />
           </Route>
 
-          <Route element={<RoleShell title="Users" allowedRole={ROLES.SUPER_ADMIN} />}>
-            <Route path="/admin/users" element={<UsersList />} />
+          <Route
+            element={
+              <PermissionShell title="Settings" permissions={ROUTE_ACCESS.adminSettings} />
+            }
+          >
+            <Route path="/admin/settings" element={<AdminSettingsLayout />}>
+              <Route index element={<AdminSettingsDefaultRedirect />} />
+              <Route
+                path="users"
+                element={
+                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[0].permissions}>
+                    <UsersList />
+                  </AdminSettingsTab>
+                }
+              />
+              <Route
+                path="sectors"
+                element={
+                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[1].permissions}>
+                    <SectorsAdmin />
+                  </AdminSettingsTab>
+                }
+              />
+              <Route
+                path="permissions"
+                element={
+                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[2].permissions}>
+                    <PermissionsAdmin />
+                  </AdminSettingsTab>
+                }
+              />
+              <Route
+                path="sector-officer"
+                element={
+                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[3].permissions}>
+                    <SectorLeadHandoff />
+                  </AdminSettingsTab>
+                }
+              />
+              <Route
+                path="sector-officer/reassign"
+                element={
+                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[3].permissions}>
+                    <SectorLeadReassign />
+                  </AdminSettingsTab>
+                }
+              />
+              <Route
+                path="compliance"
+                element={
+                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[4].permissions}>
+                    <ComplianceFilingsOverview />
+                  </AdminSettingsTab>
+                }
+              />
+              <Route
+                path="compliance/:userId"
+                element={
+                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[4].permissions}>
+                    <ComplianceFilingDetail />
+                  </AdminSettingsTab>
+                }
+              />
+            </Route>
           </Route>
 
-          <Route element={<RoleShell title="Add User" allowedRole={ROLES.SUPER_ADMIN} />}>
+          <Route path="/admin/users" element={<Navigate to="/admin/settings/users" replace />} />
+          <Route path="/admin/permissions" element={<Navigate to="/admin/settings/permissions" replace />} />
+          <Route path="/admin/sectors" element={<Navigate to="/admin/settings/sectors" replace />} />
+          <Route
+            path="/dashboard/super-admin/sector-lead/handoff"
+            element={<Navigate to="/admin/settings/sector-officer" replace />}
+          />
+          <Route
+            path="/dashboard/super-admin/sector-lead/reassign"
+            element={<Navigate to="/admin/settings/sector-officer" replace />}
+          />
+          <Route
+            path="/dashboard/super-admin/compliance"
+            element={<Navigate to="/admin/settings/compliance" replace />}
+          />
+          <Route
+            path="/dashboard/super-admin/compliance/:userId"
+            element={<Navigate to="/admin/settings/compliance/:userId" replace />}
+          />
+
+          <Route element={<PermissionShell title="Add User" permissions={ROUTE_ACCESS.users} />}>
             <Route path="/admin/users/new" element={<NewUser />} />
           </Route>
 
-          <Route element={<RoleShell title="User Detail" allowedRole={ROLES.SUPER_ADMIN} />}>
+          <Route element={<PermissionShell title="User Detail" permissions={ROUTE_ACCESS.users} />}>
             <Route path="/admin/users/:id" element={<UserDetail />} />
-          </Route>
-
-          <Route element={<RoleShell title="Sectors" allowedRole={ROLES.SUPER_ADMIN} />}>
-            <Route path="/admin/sectors" element={<SectorsAdmin />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

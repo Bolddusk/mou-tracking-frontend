@@ -16,6 +16,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import Modal from '../../components/Modal'
 import PartyBCredentialsModal from '../../components/PartyBCredentialsModal'
 import ProposalChatPanel from '../../components/proposal/ProposalChatPanel'
+import ProposalMouPartyCards from '../../components/proposal/ProposalMouPartyCards'
 import ProposalPartyContactsEditor from '../../components/proposal/ProposalPartyContactsEditor'
 import ProposalExportMenu from '../../components/proposal/ProposalExportMenu'
 import ProposalExportReportModal from '../../components/proposal/ProposalExportReportModal'
@@ -42,6 +43,18 @@ const ACTIVITY_STATUS_STYLES = {
   pending: 'bg-amber-100 text-amber-800 ring-amber-200',
   approved: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
   rejected: 'bg-red-100 text-red-800 ring-red-200',
+}
+
+/** Matchmaking engagement proposals only — skip for legacy direct MOUs. */
+function shouldLoadEngagementMatch(proposal) {
+  if (!proposal) return false
+  if (proposal.side === 'side_a' || proposal.side === 'side_b') return true
+  if (proposal.mm_proposal_id) return true
+  if (proposal.parent_mm_proposal_id) return true
+  if (proposal.engagement_proposal_id && proposal.engagement_proposal_id === proposal.id) {
+    return true
+  }
+  return false
 }
 
 export default function ProposalDetail() {
@@ -188,6 +201,7 @@ export default function ProposalDetail() {
   const canMarkSigned = (isSectorLead || isSuperAdmin) && !isDealClosed
 
   const canEditPartyContacts = Boolean(proposal?.capabilities?.can_edit_party_contacts)
+  const canManagePartyContacts = canEditPartyContacts || isSuperAdmin
 
   const enqueueCredentialPrompts = (prompts) => {
     if (!prompts.length) return
@@ -242,20 +256,25 @@ export default function ProposalDetail() {
       setProposal(prop)
       setActivities(actRes.activities || [])
 
-      try {
-        const match = await mmApi.getEngagementMatch(id)
-        setMmMatch(match)
-        if (match?.id && isMatchMouReady(match.status)) {
-          try {
-            const mou = await mmApi.getMatchMou(match.id)
-            setMouStatus(mou?.mou_status ?? null)
-          } catch {
+      if (shouldLoadEngagementMatch(prop)) {
+        try {
+          const match = await mmApi.getEngagementMatch(id)
+          setMmMatch(match)
+          if (match?.id && isMatchMouReady(match.status)) {
+            try {
+              const mou = await mmApi.getMatchMou(match.id)
+              setMouStatus(mou?.mou_status ?? null)
+            } catch {
+              setMouStatus(null)
+            }
+          } else {
             setMouStatus(null)
           }
-        } else {
+        } catch {
+          setMmMatch(null)
           setMouStatus(null)
         }
-      } catch {
+      } else {
         setMmMatch(null)
         if (prop?.capabilities?.can_view_mou) {
           try {
@@ -753,7 +772,15 @@ export default function ProposalDetail() {
       </div>
 
       {activeTab === 'mou' ? (
-        <MmMouPanel
+        <div className="space-y-6">
+          {proposal && (
+            <ProposalMouPartyCards
+              proposal={proposal}
+              canEditContacts={canManagePartyContacts}
+              onEditContacts={() => setContactsEditorOpen(true)}
+            />
+          )}
+          <MmMouPanel
           matchId={isMatchmakingMou ? mmMatch?.id : undefined}
           proposalId={isDirectMou ? id : undefined}
           canEdit={canEditMou}
@@ -762,6 +789,7 @@ export default function ProposalDetail() {
           onStatusChange={setMouStatus}
           onDealClosed={handleDealClosed}
         />
+        </div>
       ) : activeTab === 'chat' ? (
         <ProposalChatPanel
           proposalId={Number(id)}
@@ -773,7 +801,7 @@ export default function ProposalDetail() {
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
             <div>
-              <h2 className="text-lg font-semibold text-slate-800">Activity Timeline</h2>
+              <h2 className="text-lg font-semibold text-slate-800">Activity Log</h2>
               <p className="text-sm text-slate-500">Progress updates and review history</p>
             </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -781,7 +809,7 @@ export default function ProposalDetail() {
             </span>
           </div>
 
-          <div className="px-6 py-6">
+          <div className="px-2 py-2 sm:px-4">
             {activities.length === 0 ? (
               <EmptyState
                 icon="📭"
@@ -789,53 +817,74 @@ export default function ProposalDetail() {
                 text="Add a progress update or request an update from Party A."
               />
             ) : (
-              <div className="relative space-y-0">
-                <div className="absolute bottom-4 left-[11px] top-4 w-0.5 bg-gradient-to-b from-green-400 via-green-200 to-transparent" />
-                {activities.map((activity, index) => (
-                  <ActivityCard
-                    key={activity.id}
-                    activity={activity}
-                    isLast={index === activities.length - 1}
-                    isCardExpanded={expandedActivityId === activity.id}
-                    onToggleCard={() =>
-                      setExpandedActivityId((prev) =>
-                        prev === activity.id ? null : activity.id,
-                      )
-                    }
-                    canReview={canReview && !isRfpEngagement && !isDealClosed}
-                    canComment={!isRfpEngagement && !isDealClosed}
-                    actionLoading={actionLoading}
-                    expanded={expandedComments[activity.id]}
-                    commentDraft={commentDrafts[activity.id] || ''}
-                    onToggleComments={() =>
-                      setExpandedComments((e) => ({ ...e, [activity.id]: !e[activity.id] }))
-                    }
-                    onCommentDraftChange={(val) =>
-                      setCommentDrafts((d) => ({ ...d, [activity.id]: val }))
-                    }
-                    onAddComment={() => handleAddComment(activity.id)}
-                    onOpenFile={(url, title) =>
-                      setFilePreview({ url: resolveFileUrl(url), title })
-                    }
-                    onApprove={() => {
-                      setApproveTarget(activity)
-                      setApproveComment('')
-                    }}
-                    onReject={() => {
-                      setRejectTarget(activity)
-                      setRejectComment('')
-                    }}
-                    showRespondToPoke={isPartyA && activity.can_respond}
-                    onRespondToPoke={() => openActivityModal(true, activity.id)}
-                  />
-                ))}
+              <div className="overflow-x-auto">
+                <table className="min-w-[760px] w-full text-left text-sm">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="whitespace-nowrap px-4 py-3 font-semibold">Date</th>
+                      <th className="px-4 py-3 font-semibold">Update</th>
+                      <th className="whitespace-nowrap px-4 py-3 font-semibold">Added by</th>
+                      <th className="whitespace-nowrap px-4 py-3 font-semibold">Status</th>
+                      <th className="whitespace-nowrap px-4 py-3 font-semibold text-right">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {activities.map((activity) => (
+                      <ActivityTableRow
+                        key={activity.id}
+                        activity={activity}
+                        isExpanded={expandedActivityId === activity.id}
+                        onToggleExpand={() =>
+                          setExpandedActivityId((prev) =>
+                            prev === activity.id ? null : activity.id,
+                          )
+                        }
+                        canReview={canReview && !isRfpEngagement && !isDealClosed}
+                        canComment={!isRfpEngagement && !isDealClosed}
+                        actionLoading={actionLoading}
+                        expanded={expandedComments[activity.id]}
+                        commentDraft={commentDrafts[activity.id] || ''}
+                        onToggleComments={() =>
+                          setExpandedComments((e) => ({ ...e, [activity.id]: !e[activity.id] }))
+                        }
+                        onCommentDraftChange={(val) =>
+                          setCommentDrafts((d) => ({ ...d, [activity.id]: val }))
+                        }
+                        onAddComment={() => handleAddComment(activity.id)}
+                        onOpenFile={(url, title) =>
+                          setFilePreview({ url: resolveFileUrl(url), title })
+                        }
+                        onApprove={() => {
+                          setApproveTarget(activity)
+                          setApproveComment('')
+                        }}
+                        onReject={() => {
+                          setRejectTarget(activity)
+                          setRejectComment('')
+                        }}
+                        showRespondToPoke={isPartyA && activity.can_respond}
+                        onRespondToPoke={() => openActivityModal(true, activity.id)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
         </section>
       ) : (
         <>
-          {canEditPartyContacts && (
+          {(isSuperAdmin || isSectorLead) && proposal && (
+            <ProposalMouPartyCards
+              proposal={proposal}
+              canEditContacts={canManagePartyContacts}
+              onEditContacts={() => setContactsEditorOpen(true)}
+            />
+          )}
+
+          {canManagePartyContacts && (
             <div className="flex flex-col gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1 text-sm text-green-900">
                 {needsPartyAAccountSetup(proposal) && (
@@ -1056,11 +1105,10 @@ function EmptyState({ icon, title, text }) {
   )
 }
 
-function ActivityCard({
+function ActivityTableRow({
   activity,
-  isLast,
-  isCardExpanded,
-  onToggleCard,
+  isExpanded,
+  onToggleExpand,
   canReview,
   canComment = true,
   actionLoading,
@@ -1079,87 +1127,122 @@ function ActivityCard({
     ACTIVITY_STATUS_STYLES[activity.status] || ACTIVITY_STATUS_STYLES.pending
   const commentCount = activity.comments?.length || 0
   const approvalCount = activity.approvals?.length || 0
+  const roleLabel = ROLE_LABELS[activity.added_by_role] || activity.added_by_role
 
   return (
-    <div className={`relative pl-10 ${isLast ? '' : isCardExpanded ? 'pb-6' : 'pb-3'}`}>
-      <span
-        className={`absolute left-0 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-green-500 shadow ring-4 ring-green-100 ${
-          isCardExpanded ? 'top-5' : 'top-3'
-        }`}
+    <>
+      <tr
+        className={`group transition-colors hover:bg-slate-50/80 ${
+          showRespondToPoke ? 'bg-amber-50/60' : ''
+        } ${isExpanded ? 'bg-slate-50/50' : ''}`}
       >
-        <span className="h-2 w-2 rounded-full bg-white" />
-      </span>
-
-      <article
-        className={`overflow-hidden rounded-xl border bg-slate-50/30 shadow-sm transition-shadow ${
-          showRespondToPoke
-            ? 'border-amber-300 ring-1 ring-amber-100'
-            : `border-slate-200 ${isCardExpanded ? 'hover:shadow-md' : 'hover:border-slate-300'}`
-        }`}
-      >
-        <button
-          type="button"
-          onClick={onToggleCard}
-          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50/80"
-        >
-          <div className="min-w-0 flex-1">
+        <td className="whitespace-nowrap px-4 py-3 align-top text-slate-600">
+          <time className="text-xs font-medium">{formatDate(activity.activity_date)}</time>
+        </td>
+        <td className="max-w-[280px] px-4 py-3 align-top">
+          <button type="button" onClick={onToggleExpand} className="w-full text-left">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <time className="text-xs font-semibold text-green-700">
-                {formatDate(activity.activity_date)}
-              </time>
-              <h4 className="truncate text-sm font-bold text-slate-800">{activity.title}</h4>
+              <span className="font-semibold text-slate-800">{activity.title}</span>
               {activity.is_poke && (
                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
                   Update request
                 </span>
               )}
             </div>
-            {!isCardExpanded && (
+            {!isExpanded && (
               <p className="mt-0.5 truncate text-xs text-slate-500">
-                {activity.added_by_name} · {ROLE_LABELS[activity.added_by_role] || activity.added_by_role}
-                {activity.poke_response &&
-                  ` · Response: ${activity.poke_response.title}`}
-                {!activity.is_poke && activity.support_file_url && ' · Proof attached'}
-                {approvalCount > 0 && ` · ${approvalCount} review${approvalCount > 1 ? 's' : ''}`}
-                {commentCount > 0 && ` · ${commentCount} comment${commentCount > 1 ? 's' : ''}`}
+                {activity.description ||
+                  (activity.poke_response && `Response: ${activity.poke_response.title}`) ||
+                  (activity.support_file_url && 'Proof attached') ||
+                  '—'}
               </p>
             )}
-          </div>
+          </button>
+          {activity.is_poke && activity.poke_response && !isExpanded && (
+            <p className="mt-1 text-xs text-green-800">
+              <span className="font-medium">Party A:</span> {activity.poke_response.title}
+            </p>
+          )}
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 align-top">
+          <p className="font-medium text-slate-800">{activity.added_by_name}</p>
+          <p className="text-xs text-slate-500">{roleLabel}</p>
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 align-top">
           <span
-            className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-bold capitalize ring-1 ring-inset ${statusStyle}`}
+            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold capitalize ring-1 ring-inset ${statusStyle}`}
           >
             {activity.status}
           </span>
-          <span className="shrink-0 text-slate-400" aria-hidden>
-            {isCardExpanded ? '▾' : '▸'}
-          </span>
-        </button>
-
-        {showRespondToPoke && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-amber-200 bg-amber-50/80 px-4 py-2.5">
-            <p className="text-xs text-amber-900">
-              Party A response needed — your answer will be saved on this update request.
-            </p>
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 align-top text-right">
+          <div className="flex items-center justify-end gap-1">
+            {canReview && activity.status === 'pending' && (
+              <ActionGroup>
+                <IconButton
+                  variant="approve"
+                  title="Approve activity"
+                  disabled={actionLoading}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onApprove()
+                  }}
+                >
+                  <ApproveIcon />
+                </IconButton>
+                <IconButton
+                  variant="reject"
+                  title="Reject activity"
+                  disabled={actionLoading}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onReject()
+                  }}
+                >
+                  <RejectIcon />
+                </IconButton>
+              </ActionGroup>
+            )}
+            {commentCount > 0 && (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                {commentCount}
+              </span>
+            )}
             <button
               type="button"
-              onClick={onRespondToPoke}
-              className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+              onClick={onToggleExpand}
+              className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              title={isExpanded ? 'Collapse details' : 'Expand details'}
+              aria-expanded={isExpanded}
             >
-              Respond to Update Request
+              {isExpanded ? '▾' : '▸'}
             </button>
           </div>
-        )}
+        </td>
+      </tr>
 
-        {activity.is_poke && activity.poke_response && !isCardExpanded && (
-          <div className="border-t border-green-100 bg-green-50/50 px-4 py-2 text-xs text-green-900">
-            <span className="font-semibold">Party A response:</span>{' '}
-            {activity.poke_response.title} · {formatDate(activity.poke_response.work_date)}
-            {activity.poke_response.support_file_url && ' · Proof attached'}
-          </div>
-        )}
+      {showRespondToPoke && (
+        <tr className="bg-amber-50/80">
+          <td colSpan={5} className="border-t border-amber-100 px-4 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-amber-900">
+                Party A response needed — your answer will be saved on this update request.
+              </p>
+              <button
+                type="button"
+                onClick={onRespondToPoke}
+                className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+              >
+                Respond to Update Request
+              </button>
+            </div>
+          </td>
+        </tr>
+      )}
 
-        {isCardExpanded && (
-          <div className="border-t border-slate-200/80 px-5 pb-5 pt-4">
+      {isExpanded && (
+        <tr className="bg-slate-50/40">
+          <td colSpan={5} className="border-t border-slate-100 px-4 py-4">
             {activity.description && (
               <p className="text-sm leading-relaxed text-slate-600">{activity.description}</p>
             )}
@@ -1174,7 +1257,7 @@ function ActivityCard({
             )}
 
             {activity.is_poke && activity.poke_response && (
-              <div className="mt-4 rounded-lg border border-green-200 bg-green-50/60 p-4">
+              <div className="mt-3 rounded-lg border border-green-200 bg-green-50/60 p-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-green-800">
                   Party A response
                 </p>
@@ -1210,40 +1293,11 @@ function ActivityCard({
               </div>
             )}
 
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              <span className="rounded-md bg-white px-2 py-1 font-medium text-slate-700 shadow-sm">
-                {activity.added_by_name}
-              </span>
-              <span className="rounded-md bg-slate-200/60 px-2 py-1">
-                {ROLE_LABELS[activity.added_by_role] || activity.added_by_role}
-              </span>
-            </div>
-
-            {canReview && activity.status === 'pending' && (
-              <div className="mt-4 border-t border-slate-200/80 pt-4">
-                <ActionGroup>
-                  <IconButton
-                    variant="approve"
-                    title="Approve activity"
-                    disabled={actionLoading}
-                    onClick={onApprove}
-                  >
-                    <ApproveIcon />
-                  </IconButton>
-                  <IconButton
-                    variant="reject"
-                    title="Reject activity"
-                    disabled={actionLoading}
-                    onClick={onReject}
-                  >
-                    <RejectIcon />
-                  </IconButton>
-                </ActionGroup>
-              </div>
-            )}
-
-            {activity.approvals?.length > 0 && (
+            {approvalCount > 0 && (
               <div className="mt-4 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Reviews
+                </p>
                 {activity.approvals.map((a) => (
                   <div
                     key={a.id}
@@ -1306,10 +1360,10 @@ function ActivityCard({
                 </div>
               )}
             </div>
-          </div>
-        )}
-      </article>
-    </div>
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 

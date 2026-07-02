@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import * as profileApi from '../../api/profile'
 import * as usersApi from '../../api/users'
 import { ActionGroup, IconButton, ViewIcon } from '../../components/ActionIcons'
@@ -40,11 +40,13 @@ function PartyAProfileStatusBadge({ user, profileMeta }) {
 
 export default function UsersList() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [users, setUsers] = useState([])
   const [profileByUserId, setProfileByUserId] = useState({})
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState(location.state?.success || '')
   const [roleFilter, setRoleFilter] = useState('')
   const [search, setSearch] = useState('')
 
@@ -86,6 +88,12 @@ export default function UsersList() {
     return () => clearTimeout(t)
   }, [load, search])
 
+  useEffect(() => {
+    if (!location.state?.success) return
+    setSuccess(location.state.success)
+    navigate(location.pathname, { replace: true, state: {} })
+  }, [location.pathname, location.state, navigate])
+
   const partyAStats = useMemo(() => {
     const partyAUsers = users.filter((u) => u.role === ROLES.PARTY_A)
     let complete = 0
@@ -114,6 +122,7 @@ export default function UsersList() {
       </div>
 
       <Alert type="error" message={error} onClose={() => setError('')} />
+      <Alert type="success" message={success} onClose={() => setSuccess('')} />
 
       {partyAStats.total > 0 && (
         <p className="text-sm text-slate-600">

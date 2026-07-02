@@ -37,9 +37,41 @@ export async function deleteProposal(id) {
 }
 
 export async function getSectorLeadProposals(status) {
-  const params = status ? { status } : {}
-  const response = await client.get('/api/proposals/sector-lead', { params })
-  return response.data
+  const { data } = await getSectorLeadProposalsPaginated(status ? { status } : {})
+  return data
+}
+
+/**
+ * Paginated list for Sector Lead — GET /api/proposals/sector-lead
+ * Same query params as GET /api/proposals/all (scoped to SL sector).
+ * @returns {{ data: object[], pagination: object|null, filters: object }}
+ */
+export async function getSectorLeadProposalsPaginated(params) {
+  const resolved =
+    typeof params === 'string' ? (params ? { status: params } : {}) : params || {}
+  const response = await client.get('/api/proposals/sector-lead', { params: resolved })
+  const body = response.data
+
+  if (Array.isArray(body)) {
+    return {
+      data: body,
+      pagination: {
+        page: 1,
+        limit: body.length,
+        total: body.length,
+        total_pages: 1,
+        has_next: false,
+        has_prev: false,
+      },
+      filters: {},
+    }
+  }
+
+  return {
+    data: Array.isArray(body?.data) ? body.data : [],
+    pagination: body?.pagination ?? null,
+    filters: body?.filters ?? {},
+  }
 }
 
 /** @param {string|Record<string, string|number|boolean|undefined>} [params] */

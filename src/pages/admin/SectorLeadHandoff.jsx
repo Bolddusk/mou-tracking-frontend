@@ -77,7 +77,7 @@ export default function SectorLeadHandoff() {
           </p>
         </div>
         <Link
-          to="/dashboard/super-admin/sector-lead/reassign"
+          to="/admin/settings/sector-officer/reassign"
           className="text-sm font-medium text-portal-primary hover:underline"
         >
           + Transfer to New Officer
@@ -160,7 +160,7 @@ function OrphansTab({ orphans, loading, totalOrphans }) {
           <p className="mt-1">
             Transfer these cases to a new officer before deleting users.{' '}
             <Link
-              to="/dashboard/super-admin/sector-lead/reassign"
+              to="/admin/settings/sector-officer/reassign"
               className="font-semibold text-red-800 underline"
             >
               Transfer now →

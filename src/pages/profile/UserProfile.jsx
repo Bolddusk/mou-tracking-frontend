@@ -25,7 +25,7 @@ function userToForm(user) {
 }
 
 export default function UserProfile() {
-  const { user, updateProfile, isPartyA, dashboardPath } = useAuth()
+  const { user, updateProfile, isPartyA, isPartyB, isInvestor, dashboardPath } = useAuth()
   const [form, setForm] = useState(EMPTY_FORM)
   const [readOnly, setReadOnly] = useState({ role: '', sector: '', country: '' })
   const [loading, setLoading] = useState(true)
@@ -108,6 +108,19 @@ export default function UserProfile() {
 
       <Alert type="error" message={error} onClose={() => setError('')} />
       <Alert type="success" message={success} onClose={() => setSuccess('')} />
+
+      {(isPartyB || isInvestor) && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+          For company certificates, sectors, and mandatory documents, open{' '}
+          <Link
+            to="/dashboard/party-b/profile"
+            className="font-semibold text-green-800 underline hover:text-green-950"
+          >
+            Company Profile
+          </Link>
+          .
+        </div>
+      )}
 
       {isPartyA && (
         <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">

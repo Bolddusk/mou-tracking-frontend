@@ -21,6 +21,7 @@ import ProposalOpportunitiesToolbar from '../../components/proposals/ProposalOpp
 import {
   buildCooperationModeFilters,
   buildProposalListParams,
+  DEFAULT_MOU_LIFECYCLE_STATUSES,
   getProposalListEmptyMessage,
   PROPOSAL_STATUS_FILTERS,
 } from '../../constants/proposalFilters'
@@ -32,10 +33,7 @@ const DEFAULT_PAGE_LIMIT = 20
 
 const EMPTY_ADVANCED_FILTERS = {
   sector: '',
-  mouStatus: '',
-  hasMou: '',
-  hasPitch: '',
-  dealClosed: '',
+  mouLifecycle: '',
   dateFrom: '',
   dateTo: '',
 }
@@ -79,7 +77,7 @@ export default function SuperAdminDashboard() {
         if (!cancelled) setFilterOptions(data)
       })
       .catch(() => {
-        if (!cancelled) setFilterOptions({ sectors: [], proposal_statuses: [], mou_statuses: [], cooperation_modes: [], conferences: [] })
+        if (!cancelled) setFilterOptions({ sectors: [], proposal_statuses: [], mou_lifecycle_statuses: DEFAULT_MOU_LIFECYCLE_STATUSES, cooperation_modes: [], conferences: [] })
       })
     return () => {
       cancelled = true
@@ -101,15 +99,12 @@ export default function SuperAdminDashboard() {
       buildProposalListParams({
         status: statusFilter,
         sector: advancedFilters.sector,
-        mou_status: advancedFilters.mouStatus,
+        mou_lifecycle: advancedFilters.mouLifecycle,
         cooperation_mode: cooperationModeFilter,
         conference_key: conferenceFilter,
         q: searchQuery,
         date_from: advancedFilters.dateFrom,
         date_to: advancedFilters.dateTo,
-        has_mou: advancedFilters.hasMou,
-        has_pitch: advancedFilters.hasPitch,
-        deal_closed: advancedFilters.dealClosed,
         page,
         limit,
       }),
@@ -335,23 +330,17 @@ export default function SuperAdminDashboard() {
           selectedConference={selectedConference}
           sector={advancedFilters.sector}
           onSectorChange={(v) => setAdvanced('sector', v)}
-          mouStatus={advancedFilters.mouStatus}
-          onMouStatusChange={(v) => setAdvanced('mouStatus', v)}
+          mouLifecycle={advancedFilters.mouLifecycle}
+          onMouLifecycleChange={(v) => setAdvanced('mouLifecycle', v)}
           cooperationMode={cooperationModeFilter}
           onCooperationModeChange={setCooperationModeFilter}
           cooperationModeFilters={cooperationModeFilters}
-          hasMou={advancedFilters.hasMou}
-          onHasMouChange={(v) => setAdvanced('hasMou', v)}
-          hasPitch={advancedFilters.hasPitch}
-          onHasPitchChange={(v) => setAdvanced('hasPitch', v)}
-          dealClosed={advancedFilters.dealClosed}
-          onDealClosedChange={(v) => setAdvanced('dealClosed', v)}
           dateFrom={advancedFilters.dateFrom}
           onDateFromChange={(v) => setAdvanced('dateFrom', v)}
           dateTo={advancedFilters.dateTo}
           onDateToChange={(v) => setAdvanced('dateTo', v)}
           sectors={filterOptions?.sectors || []}
-          mouStatuses={filterOptions?.mou_statuses || []}
+          mouLifecycleStatuses={filterOptions?.mou_lifecycle_statuses || DEFAULT_MOU_LIFECYCLE_STATUSES}
           onClearAll={clearAllFilters}
           hasActiveFilters={hasActiveFilters || Boolean(statusFilter)}
         />
@@ -361,6 +350,8 @@ export default function SuperAdminDashboard() {
           loading={loading}
           emptyMessage={emptyMessage}
           showCooperationMode
+          showMouLifecycle
+          showDocumentLinks={false}
           onView={handleView}
           onOpenFile={openFile}
           renderActions={(p) => (

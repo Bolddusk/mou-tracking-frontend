@@ -20,7 +20,7 @@ export const PROPOSAL_STATUS_FILTERS = {
   ],
   sectorLead: [
     { key: '', label: 'All' },
-    { key: 'submitted', label: 'Pending' },
+    { key: 'submitted', label: 'Submitted' },
     { key: 'resubmitted', label: 'Resubmitted' },
     { key: 'approved', label: 'Approved' },
     { key: 'completed', label: 'Completed' },
@@ -72,17 +72,17 @@ export function filterProposals(proposals, { status = '', search = '' } = {}) {
   return filterProposalsBySearch(filterProposalsByStatus(proposals, status), search)
 }
 
-export const BOOL_FILTER_OPTIONS = [
-  { value: '', label: 'All' },
-  { value: 'true', label: 'Yes' },
-  { value: 'false', label: 'No' },
-]
-
 export const COOPERATION_MODE_LABELS = {
   mou: 'MoU',
   jv: 'JV',
   agreement: 'Agreement',
 }
+
+export const DEFAULT_MOU_LIFECYCLE_STATUSES = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'execution', label: 'Execution' },
+]
 
 const DEFAULT_COOPERATION_MODES = ['mou', 'jv', 'agreement']
 
@@ -110,34 +110,34 @@ export function buildCooperationModeFilters(cooperationModes) {
 export function buildProposalListParams({
   status = '',
   sector = '',
-  mou_status = '',
+  mou_lifecycle = '',
   cooperation_mode = '',
   conference_key = '',
   q = '',
   date_from = '',
   date_to = '',
-  has_mou = '',
-  has_pitch = '',
-  deal_closed = '',
   page = 1,
   limit = 20,
 } = {}) {
   const params = {}
   if (status) params.status = status
   if (sector) params.sector = sector
-  if (mou_status) params.mou_status = mou_status
+  if (mou_lifecycle) params.mou_lifecycle = mou_lifecycle
   if (cooperation_mode) params.cooperation_mode = cooperation_mode
   if (conference_key) params.conference_key = conference_key
   const trimmedQ = q?.trim()
   if (trimmedQ) params.q = trimmedQ
   if (date_from) params.date_from = date_from
   if (date_to) params.date_to = date_to
-  if (has_mou === 'true' || has_mou === 'false') params.has_mou = has_mou
-  if (has_pitch === 'true' || has_pitch === 'false') params.has_pitch = has_pitch
-  if (deal_closed === 'true' || deal_closed === 'false') params.deal_closed = deal_closed
   if (page != null && page > 0) params.page = page
   if (limit != null && limit > 0) params.limit = limit
   return params
+}
+
+/** Sector Lead list params — never sends `sector` (backend auto-scopes). */
+export function buildSectorLeadListParams(params = {}) {
+  const { sector: _sector, ...rest } = params
+  return buildProposalListParams(rest)
 }
 
 export const PAGE_SIZE_OPTIONS = [10, 20, 50]

@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import * as proposalsApi from '../../api/proposals'
 import Alert from '../../components/Alert'
+import ProposalOpportunitiesFilterBar from '../../components/proposals/ProposalOpportunitiesFilterBar'
+import ProposalOpportunitiesPagination from '../../components/proposals/ProposalOpportunitiesPagination'
 import ProposalOpportunitiesTable from '../../components/proposals/ProposalOpportunitiesTable'
 import ProposalOpportunitiesToolbar from '../../components/proposals/ProposalOpportunitiesToolbar'
 import {
-  filterProposalsBySearch,
+  buildCooperationModeFilters,
+  buildSectorLeadListParams,
+  DEFAULT_MOU_LIFECYCLE_STATUSES,
   getProposalListEmptyMessage,
   PROPOSAL_STATUS_FILTERS,
 } from '../../constants/proposalFilters'
@@ -25,13 +29,32 @@ import { getPartyAProfilePaths } from '../../constants/profileRoutes'
 import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { getErrorMessage } from '../../utils/format'
 
+const DEFAULT_PAGE_LIMIT = 20
+
+const EMPTY_ADVANCED_FILTERS = {
+  mouLifecycle: '',
+  dateFrom: '',
+  dateTo: '',
+}
+
 export default function SectorLeadDashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const profilePaths = getPartyAProfilePaths(user?.role)
+
   const [statusFilter, setStatusFilter] = useState('')
+  const [cooperationModeFilter, setCooperationModeFilter] = useState('')
+  const [conferenceFilter, setConferenceFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT)
+  const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [advancedFilters, setAdvancedFilters] = useState(EMPTY_ADVANCED_FILTERS)
+  const [filterOptions, setFilterOptions] = useState(null)
   const [proposals, setProposals] = useState([])
+  const [pagination, setPagination] = useState(null)
+  const [statsProposals, setStatsProposals] = useState([])
+  const [statsTotal, setStatsTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -43,51 +66,149 @@ export default function SectorLeadDashboard() {
   const [partyBCredentials, setPartyBCredentials] = useState(null)
   const [partyBCredentialsSubtitle, setPartyBCredentialsSubtitle] = useState('')
 
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchInput), 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  useEffect(() => {
+    let cancelled = false
+    proposalsApi
+      .getProposalFilterOptions()
+      .then((data) => {
+        if (!cancelled) setFilterOptions(data)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFilterOptions({
+            sectors: user?.sector ? [user.sector] : [],
+            scoped_sector: user?.sector || null,
+            proposal_statuses: [],
+            mou_lifecycle_statuses: DEFAULT_MOU_LIFECYCLE_STATUSES,
+            cooperation_modes: [],
+            conferences: [],
+          })
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [user?.sector])
+
+  const cooperationModeFilters = useMemo(
+    () => buildCooperationModeFilters(filterOptions?.cooperation_modes),
+    [filterOptions?.cooperation_modes],
+  )
+
+  const selectedConference = useMemo(
+    () => (filterOptions?.conferences || []).find((c) => c.key === conferenceFilter) || null,
+    [filterOptions?.conferences, conferenceFilter],
+  )
+
+  const listParams = useMemo(
+    () =>
+      buildSectorLeadListParams({
+        status: statusFilter,
+        mou_lifecycle: advancedFilters.mouLifecycle,
+        cooperation_mode: cooperationModeFilter,
+        conference_key: conferenceFilter,
+        q: searchQuery,
+        date_from: advancedFilters.dateFrom,
+        date_to: advancedFilters.dateTo,
+        page,
+        limit,
+      }),
+    [statusFilter, searchQuery, advancedFilters, cooperationModeFilter, conferenceFilter, page, limit],
+  )
+
+  const scopedSector = filterOptions?.scoped_sector || user?.sector
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, cooperationModeFilter, conferenceFilter, searchQuery, advancedFilters])
+
+  const loadStats = useCallback(async () => {
+    try {
+      const result = await proposalsApi.getSectorLeadProposalsPaginated({ limit: 100, page: 1 })
+      setStatsProposals(result.data)
+      setStatsTotal(result.pagination?.total ?? result.data.length)
+    } catch {
+      setStatsProposals([])
+      setStatsTotal(0)
+    }
+  }, [])
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const data = await proposalsApi.getSectorLeadProposals(statusFilter || undefined)
-      setProposals(Array.isArray(data) ? data : [])
+      const result = await proposalsApi.getSectorLeadProposalsPaginated(listParams)
+      setProposals(result.data)
+      setPagination(result.pagination)
     } catch (err) {
       setError(getErrorMessage(err))
+      setProposals([])
+      setPagination(null)
     } finally {
       setLoading(false)
     }
-  }, [statusFilter])
+  }, [listParams])
+
+  useEffect(() => {
+    loadStats()
+  }, [loadStats])
 
   useEffect(() => {
     load()
   }, [load])
 
-  const visibleProposals = useMemo(
-    () => filterProposalsBySearch(proposals, searchQuery),
-    [proposals, searchQuery],
-  )
-
   const stats = useMemo(() => {
     const counts = {
-      total: proposals.length,
+      total: statsTotal,
       submitted: 0,
       resubmitted: 0,
       approved: 0,
       completed: 0,
       rejected: 0,
     }
-    for (const p of proposals) {
+    for (const p of statsProposals) {
       const s = (p.status || '').toLowerCase()
       if (s in counts) counts[s]++
     }
     return counts
-  }, [proposals])
+  }, [statsProposals, statsTotal])
+
+  const hasActiveAdvancedFilters = useMemo(
+    () => Object.values(advancedFilters).some(Boolean),
+    [advancedFilters],
+  )
+
+  const hasActiveFilters =
+    hasActiveAdvancedFilters ||
+    Boolean(searchQuery.trim()) ||
+    Boolean(cooperationModeFilter) ||
+    Boolean(conferenceFilter)
 
   const emptyMessage = getProposalListEmptyMessage({
-    totalCount: proposals.length,
+    totalCount: pagination?.total ?? proposals.length,
     statusFilter,
     searchQuery,
     statusFilters: PROPOSAL_STATUS_FILTERS.sectorLead,
-    defaultMessage: 'No opportunities in this queue.',
+    defaultMessage: hasActiveFilters
+      ? 'No opportunities match the current filters.'
+      : 'No opportunities in this queue.',
   })
+
+  const clearAllFilters = () => {
+    setSearchInput('')
+    setSearchQuery('')
+    setStatusFilter('')
+    setCooperationModeFilter('')
+    setConferenceFilter('')
+    setPage(1)
+    setLimit(DEFAULT_PAGE_LIMIT)
+    setAdvancedFilters(EMPTY_ADVANCED_FILTERS)
+  }
 
   const openFile = (url, title) => setFilePreview({ url, title })
 
@@ -137,7 +258,7 @@ export default function SectorLeadDashboard() {
         setSuccess(`Opportunity #${actionProposal.id} rejected`)
       }
       closeAction()
-      await load()
+      await Promise.all([load(), loadStats()])
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -145,12 +266,44 @@ export default function SectorLeadDashboard() {
     }
   }
 
+  const setAdvanced = (key, value) => {
+    setAdvancedFilters((prev) => ({ ...prev, [key]: value }))
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-slate-800">Sector Review Queue</h3>
-        <p className="text-sm text-slate-500">
-          Your sector: <strong>{user?.sector || '—'}</strong>
+      <div className="rounded-xl border border-green-700/20 bg-gradient-to-r from-green-800 to-green-700 p-5 text-white">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-green-100 ring-1 ring-white/25">
+            Sector Lead
+          </span>
+          <p className="text-xs font-semibold uppercase tracking-widest text-green-100/90">
+            Direct Opportunities
+          </p>
+        </div>
+        <h3 className="mt-2 text-lg font-semibold">Sector Review Queue</h3>
+        <p className="mt-1 text-sm text-green-50/90">
+          Proposals in <strong>{scopedSector || 'your sector'}</strong> — approve, reject, and
+          monitor MOU progress. Matchmaking items are under{' '}
+          <strong>Matchmaking Review</strong> in the sidebar.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-900">
+        <p className="font-semibold">Matchmaking review</p>
+        <p className="mt-1">
+          <Link to="/matchmaking/forwarded" className="font-semibold text-portal-primary hover:underline">
+            Forwarded to me
+          </Link>
+          ,{' '}
+          <Link to="/matchmaking/board" className="font-semibold text-portal-primary hover:underline">
+            Matching board
+          </Link>
+          ,{' '}
+          <Link to="/matchmaking/matches" className="font-semibold text-portal-primary hover:underline">
+            Matches
+          </Link>
+          .
         </p>
       </div>
 
@@ -159,24 +312,53 @@ export default function SectorLeadDashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard color="teal" label="In view" value={stats.total} icon={<span>Σ</span>} />
-        <StatCard color="yellow" label="Pending" value={stats.submitted} icon={<span>⏳</span>} />
+        <StatCard
+          color="yellow"
+          label="Pending"
+          value={stats.submitted + stats.resubmitted}
+          icon={<span>⏳</span>}
+        />
         <StatCard color="green" label="Approved" value={stats.approved} icon={<span>✓</span>} />
         <StatCard color="red" label="Rejected" value={stats.rejected} icon={<span>✕</span>} />
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <ProposalOpportunitiesToolbar
-          search={searchQuery}
-          onSearchChange={setSearchQuery}
+          title="Direct Opportunities"
+          search={searchInput}
+          onSearchChange={setSearchInput}
           statusFilters={PROPOSAL_STATUS_FILTERS.sectorLead}
           statusValue={statusFilter}
           onStatusChange={setStatusFilter}
         />
 
+        <ProposalOpportunitiesFilterBar
+          conferenceKey={conferenceFilter}
+          onConferenceChange={setConferenceFilter}
+          conferences={filterOptions?.conferences || []}
+          selectedConference={selectedConference}
+          mouLifecycle={advancedFilters.mouLifecycle}
+          onMouLifecycleChange={(v) => setAdvanced('mouLifecycle', v)}
+          cooperationMode={cooperationModeFilter}
+          onCooperationModeChange={setCooperationModeFilter}
+          cooperationModeFilters={cooperationModeFilters}
+          dateFrom={advancedFilters.dateFrom}
+          onDateFromChange={(v) => setAdvanced('dateFrom', v)}
+          dateTo={advancedFilters.dateTo}
+          onDateToChange={(v) => setAdvanced('dateTo', v)}
+          mouLifecycleStatuses={filterOptions?.mou_lifecycle_statuses || DEFAULT_MOU_LIFECYCLE_STATUSES}
+          hideSectorFilter
+          onClearAll={clearAllFilters}
+          hasActiveFilters={hasActiveFilters || Boolean(statusFilter)}
+        />
+
         <ProposalOpportunitiesTable
-          proposals={visibleProposals}
+          proposals={proposals}
           loading={loading}
           emptyMessage={emptyMessage}
+          showCooperationMode
+          showMouLifecycle
+          showDocumentLinks={false}
           onView={handleView}
           onOpenFile={openFile}
           renderStatusExtra={(p) =>
@@ -202,17 +384,29 @@ export default function SectorLeadDashboard() {
                 </button>
               )}
               {(p.status === 'submitted' || p.status === 'resubmitted') && (
-                          <>
-                            <IconButton variant="approve" title="Approve" onClick={() => openApprove(p)}>
-                              <ApproveIcon />
-                            </IconButton>
-                            <IconButton variant="reject" title="Reject" onClick={() => openReject(p)}>
-                              <RejectIcon />
-                            </IconButton>
-                          </>
-                        )}
+                <>
+                  <IconButton variant="approve" title="Approve" onClick={() => openApprove(p)}>
+                    <ApproveIcon />
+                  </IconButton>
+                  <IconButton variant="reject" title="Reject" onClick={() => openReject(p)}>
+                    <RejectIcon />
+                  </IconButton>
+                </>
+              )}
             </ActionGroup>
           )}
+        />
+
+        <ProposalOpportunitiesPagination
+          pagination={pagination}
+          limit={limit}
+          onLimitChange={(newLimit) => {
+            setPage(1)
+            setLimit(newLimit)
+          }}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => p + 1)}
+          loading={loading}
         />
       </div>
 

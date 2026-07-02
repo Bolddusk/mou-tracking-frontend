@@ -1,5 +1,6 @@
 import DocLink from '../DocLink'
 import LoadingSpinner from '../LoadingSpinner'
+import MouLifecycleBadge from './MouLifecycleBadge'
 import PokeStatusBadge from '../PokeStatusBadge'
 import StatusBadge from '../StatusBadge'
 import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
@@ -18,6 +19,8 @@ export default function ProposalOpportunitiesTable({
   renderUpdateExtra,
   renderStatusExtra,
   showCooperationMode = false,
+  showMouLifecycle = false,
+  showDocumentLinks = true,
 }) {
   if (loading) {
     return (
@@ -43,8 +46,15 @@ export default function ProposalOpportunitiesTable({
             {showCooperationMode && (
               <th className="px-4 py-3 font-semibold">Mode</th>
             )}
-            <th className="px-4 py-3 font-semibold">Pitch</th>
-            <th className="px-4 py-3 font-semibold">MOU</th>
+            {showDocumentLinks && (
+              <>
+                <th className="px-4 py-3 font-semibold">Pitch</th>
+                <th className="px-4 py-3 font-semibold">MOU</th>
+              </>
+            )}
+            {showMouLifecycle && (
+              <th className="px-4 py-3 font-semibold">MOU Status</th>
+            )}
             <th className="px-4 py-3 font-semibold">Status</th>
             <th className="px-4 py-3 font-semibold">Request for Update</th>
             <th className="px-4 py-3 font-semibold">Date</th>
@@ -79,20 +89,32 @@ export default function ProposalOpportunitiesTable({
                     )}
                   </td>
                 )}
-                <td className="px-4 py-3">
-                  <DocLink
-                    url={p.proposal_file_url}
-                    title="View pitch deck"
-                    onOpen={(url) => onOpenFile?.(url, `Pitch Deck — ${title}`)}
-                  />
-                </td>
-                <td className="px-4 py-3">
-                  <DocLink
-                    url={p.mou_file_url}
-                    title="View MOU file"
-                    onOpen={(url) => onOpenFile?.(url, `MOU — ${title}`)}
-                  />
-                </td>
+                {showDocumentLinks && (
+                  <>
+                    <td className="px-4 py-3">
+                      <DocLink
+                        url={p.proposal_file_url}
+                        title="View pitch deck"
+                        onOpen={(url) => onOpenFile?.(url, `Pitch Deck — ${title}`)}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <DocLink
+                        url={p.mou_file_url}
+                        title="View MOU file"
+                        onOpen={(url) => onOpenFile?.(url, `MOU — ${title}`)}
+                      />
+                    </td>
+                  </>
+                )}
+                {showMouLifecycle && (
+                  <td className="px-4 py-3">
+                    <MouLifecycleBadge
+                      lifecycle={p.mou_lifecycle}
+                      label={p.mou_lifecycle_label}
+                    />
+                  </td>
+                )}
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <StatusBadge status={p.status} />

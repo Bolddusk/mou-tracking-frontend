@@ -15,6 +15,16 @@ export async function getMe() {
   return response.data
 }
 
+export async function getPermissions() {
+  const response = await client.get('/api/auth/permissions')
+  return response.data
+}
+
+export async function getRbacCatalog() {
+  const response = await client.get('/api/auth/rbac/catalog')
+  return response.data
+}
+
 export async function updateMe(payload) {
   const response = await client.patch('/api/auth/me', payload)
   return response.data

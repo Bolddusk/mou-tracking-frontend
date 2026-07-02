@@ -1,6 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import * as authApi from '../api/auth'
-import { AUTH_TOKEN_KEY, AUTH_USER_KEY, ROLES } from '../constants/sectors'
+import {
+  AUTH_RBAC_KEY,
+  AUTH_REDIRECT_KEY,
+  AUTH_TOKEN_KEY,
+  AUTH_USER_KEY,
+  ROLES,
+} from '../constants/sectors'
+import { can as checkPermission, resolveDashboardPath } from '../utils/rbac'
 
 const AuthContext = createContext(null)
 
@@ -8,50 +15,92 @@ function readStoredAuth() {
   try {
     const token = localStorage.getItem(AUTH_TOKEN_KEY)
     const userRaw = localStorage.getItem(AUTH_USER_KEY)
-    if (!token || !userRaw) return { token: null, user: null }
-    return { token, user: JSON.parse(userRaw) }
+    const rbacRaw = localStorage.getItem(AUTH_RBAC_KEY)
+    const redirect = localStorage.getItem(AUTH_REDIRECT_KEY)
+    if (!token || !userRaw) {
+      return { token: null, user: null, rbac: null, redirect: null }
+    }
+    return {
+      token,
+      user: JSON.parse(userRaw),
+      rbac: rbacRaw ? JSON.parse(rbacRaw) : null,
+      redirect: redirect || null,
+    }
   } catch {
-    return { token: null, user: null }
+    return { token: null, user: null, rbac: null, redirect: null }
   }
 }
 
-function dashboardPathForRole(role) {
-  if (role === ROLES.PARTY_A) return '/dashboard/party-a'
-  if (role === ROLES.PARTY_B) return '/dashboard/party-b'
-  if (role === ROLES.SECTOR_LEAD) return '/dashboard/sector-lead'
-  if (role === ROLES.SUPER_ADMIN) return '/dashboard/super-admin'
-  if (role === ROLES.REGIONAL_FOCAL_POINT) return '/dashboard/regional-focal'
-  if (role === ROLES.INVESTOR) return '/matchmaking/my-proposals'
-  if (role === ROLES.FOCAL_POINT) return '/matchmaking/focal-point'
-  return '/auth/login'
+function persistSession({ token, user, rbac, redirect }) {
+  localStorage.setItem(AUTH_TOKEN_KEY, token)
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user))
+  if (rbac) localStorage.setItem(AUTH_RBAC_KEY, JSON.stringify(rbac))
+  else localStorage.removeItem(AUTH_RBAC_KEY)
+  if (redirect) localStorage.setItem(AUTH_REDIRECT_KEY, redirect)
+  else localStorage.removeItem(AUTH_REDIRECT_KEY)
 }
+
 
 export function AuthProvider({ children }) {
   const stored = readStoredAuth()
   const [token, setToken] = useState(stored.token)
   const [user, setUser] = useState(stored.user)
+  const [rbac, setRbac] = useState(stored.rbac)
+  const [redirect, setRedirect] = useState(stored.redirect)
 
-  const persistAuth = useCallback((nextToken, nextUser) => {
-    localStorage.setItem(AUTH_TOKEN_KEY, nextToken)
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser))
-    setToken(nextToken)
-    setUser(nextUser)
+  const applyAuthPayload = useCallback((data) => {
+    const normalizedRedirect = data.redirect ?? data.rbac?.redirect ?? null
+    if (data.token && data.user) {
+      const next = {
+        token: data.token,
+        user: data.user,
+        rbac: data.rbac ?? null,
+        redirect: normalizedRedirect,
+      }
+      persistSession(next)
+      setToken((prev) => (prev === next.token ? prev : next.token))
+      setUser((prev) =>
+        JSON.stringify(prev) === JSON.stringify(next.user) ? prev : next.user,
+      )
+      setRbac((prev) =>
+        JSON.stringify(prev) === JSON.stringify(next.rbac) ? prev : next.rbac,
+      )
+      setRedirect((prev) => (prev === next.redirect ? prev : next.redirect))
+    } else if (data.rbac) {
+      localStorage.setItem(AUTH_RBAC_KEY, JSON.stringify(data.rbac))
+      setRbac((prev) =>
+        JSON.stringify(prev) === JSON.stringify(data.rbac) ? prev : data.rbac,
+      )
+      if (normalizedRedirect) {
+        localStorage.setItem(AUTH_REDIRECT_KEY, normalizedRedirect)
+        setRedirect((prev) => (prev === normalizedRedirect ? prev : normalizedRedirect))
+      }
+    }
   }, [])
 
-  const login = useCallback(async (email, password) => {
-    const data = await authApi.login({ email, password })
-    persistAuth(data.token, data.user)
-    if (data.user?.must_change_password) return '/auth/change-password'
-    return data.redirect || dashboardPathForRole(data.user.role)
-  }, [persistAuth])
+  const login = useCallback(
+    async (email, password) => {
+      const data = await authApi.login({ email, password })
+      applyAuthPayload(data)
+      if (data.user?.must_change_password) return '/auth/change-password'
+      return (
+        data.redirect ||
+        resolveDashboardPath({ redirect: data.redirect, rbac: data.rbac, user: data.user })
+      )
+    },
+    [applyAuthPayload],
+  )
 
   const changePassword = useCallback(
     async (currentPassword, newPassword) => {
       const data = await authApi.changePassword(currentPassword, newPassword)
-      persistAuth(data.token, data.user)
-      return data.redirect || dashboardPathForRole(data.user.role)
+      applyAuthPayload(data)
+      return (
+        data.redirect ||
+        resolveDashboardPath({ redirect: data.redirect, rbac: data.rbac, user: data.user })
+      )
     },
-    [persistAuth],
+    [applyAuthPayload],
   )
 
   const updateUser = useCallback(
@@ -66,50 +115,113 @@ export function AuthProvider({ children }) {
   const updateProfile = useCallback(
     async (payload) => {
       const data = await authApi.updateMe(payload)
-      const nextUser = data.user
-      const nextToken = data.token || token
-      if (nextUser) {
-        persistAuth(nextToken, nextUser)
-      }
+      applyAuthPayload({
+        token: data.token || token,
+        user: data.user,
+        rbac: data.rbac,
+        redirect: data.redirect,
+      })
       return data
     },
-    [token, persistAuth],
+    [token, applyAuthPayload],
   )
 
-  const register = useCallback(async (payload) => {
-    const data = await authApi.register(payload)
-    persistAuth(data.token, data.user)
-    return data.redirect || dashboardPathForRole(data.user.role)
-  }, [persistAuth])
+  const register = useCallback(
+    async (payload) => {
+      const data = await authApi.register(payload)
+      applyAuthPayload(data)
+      return (
+        data.redirect ||
+        resolveDashboardPath({ redirect: data.redirect, rbac: data.rbac, user: data.user })
+      )
+    },
+    [applyAuthPayload],
+  )
 
   const logout = useCallback(() => {
     localStorage.removeItem(AUTH_TOKEN_KEY)
     localStorage.removeItem(AUTH_USER_KEY)
+    localStorage.removeItem(AUTH_RBAC_KEY)
+    localStorage.removeItem(AUTH_REDIRECT_KEY)
     setToken(null)
     setUser(null)
+    setRbac(null)
+    setRedirect(null)
   }, [])
 
   const refreshSession = useCallback(async () => {
     if (!token) return
     try {
       const data = await authApi.getMe()
-      if (data?.user) {
-        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user))
-        setUser(data.user)
-      }
+      applyAuthPayload({
+        token,
+        user: data.user,
+        rbac: data.rbac,
+        redirect: data.redirect,
+      })
     } catch {
       // 401 handled by API client interceptor
     }
+  }, [token, applyAuthPayload])
+
+  const refreshPermissions = useCallback(async () => {
+    if (!token) return null
+    try {
+      const data = await authApi.getPermissions()
+      const nextRbac = data?.rbac ?? data
+      if (nextRbac?.permissions || nextRbac?.navigation) {
+        localStorage.setItem(AUTH_RBAC_KEY, JSON.stringify(nextRbac))
+        setRbac((prev) =>
+          JSON.stringify(prev) === JSON.stringify(nextRbac) ? prev : nextRbac,
+        )
+        const nextRedirect = data?.redirect ?? nextRbac?.redirect
+        if (nextRedirect) {
+          localStorage.setItem(AUTH_REDIRECT_KEY, nextRedirect)
+          setRedirect((prev) => (prev === nextRedirect ? prev : nextRedirect))
+        }
+      }
+      return nextRbac
+    } catch {
+      return null
+    }
   }, [token])
 
+  // Refresh session once when token appears (login / app boot) — not on every rbac update.
   useEffect(() => {
-    refreshSession()
-  }, [refreshSession])
+    if (!token) return undefined
+    let cancelled = false
+    ;(async () => {
+      try {
+        const data = await authApi.getMe()
+        if (cancelled) return
+        applyAuthPayload({
+          token,
+          user: data.user,
+          rbac: data.rbac,
+          redirect: data.redirect ?? data.rbac?.redirect ?? null,
+        })
+      } catch {
+        // 401 handled by API client interceptor
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [token, applyAuthPayload])
+
+  const can = useCallback((permission) => checkPermission(rbac, permission), [rbac])
+
+  const dashboardPath = useMemo(
+    () => resolveDashboardPath({ redirect, rbac, user }),
+    [redirect, rbac, user],
+  )
 
   const value = useMemo(
     () => ({
       token,
       user,
+      rbac,
+      redirect,
       isAuthenticated: Boolean(token && user),
       isPartyA: user?.role === ROLES.PARTY_A,
       isPartyB: user?.role === ROLES.PARTY_B,
@@ -120,6 +232,7 @@ export function AuthProvider({ children }) {
       isInvestor: user?.role === ROLES.INVESTOR,
       isFocalPoint: user?.role === ROLES.FOCAL_POINT,
       mustChangePassword: Boolean(user?.must_change_password),
+      can,
       login,
       register,
       logout,
@@ -127,9 +240,25 @@ export function AuthProvider({ children }) {
       updateProfile,
       updateUser,
       refreshSession,
-      dashboardPath: user ? dashboardPathForRole(user.role) : '/auth/login',
+      refreshPermissions,
+      dashboardPath,
     }),
-    [token, user, login, register, logout, changePassword, updateProfile, updateUser, refreshSession],
+    [
+      token,
+      user,
+      rbac,
+      redirect,
+      can,
+      login,
+      register,
+      logout,
+      changePassword,
+      updateProfile,
+      updateUser,
+      refreshSession,
+      refreshPermissions,
+      dashboardPath,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

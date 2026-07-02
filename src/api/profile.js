@@ -42,3 +42,41 @@ export async function getProfileByUserId(userId) {
   const response = await client.get(`/api/profile/${userId}`)
   return response.data
 }
+
+export async function getPartyBProfile() {
+  const response = await client.get('/api/profile/party-b')
+  return response.data
+}
+
+export async function updatePartyBProfile(payload) {
+  const response = await client.patch('/api/profile/party-b', payload)
+  return response.data
+}
+
+export async function uploadPartyBProfileDocument({ file, docType, title, description }) {
+  const formData = new FormData()
+  formData.append('document', file)
+  formData.append('doc_type', docType)
+  if (title) formData.append('title', title)
+  if (description) formData.append('description', description)
+
+  const response = await client.post('/api/profile/party-b/documents', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return response.data
+}
+
+export async function deletePartyBProfileDocument(id) {
+  const response = await client.delete(`/api/profile/party-b/documents/${id}`)
+  return response.data
+}
+
+export async function getPartyBProfiles() {
+  const response = await client.get('/api/profile/party-b')
+  return response.data
+}
+
+export async function getPartyBProfileByUserId(userId) {
+  const response = await client.get(`/api/profile/party-b/${userId}`)
+  return response.data
+}

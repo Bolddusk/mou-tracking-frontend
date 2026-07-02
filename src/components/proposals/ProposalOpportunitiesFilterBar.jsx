@@ -1,5 +1,3 @@
-import { MM_MOU_STATUS_LABELS } from '../../constants/matchmaking'
-import { BOOL_FILTER_OPTIONS } from '../../constants/proposalFilters'
 import ProposalStatusFilters from './ProposalStatusFilters'
 
 function FilterSelect({ label, value, onChange, children, className = '' }) {
@@ -42,25 +40,20 @@ export default function ProposalOpportunitiesFilterBar({
   selectedConference,
   sector,
   onSectorChange,
-  mouStatus,
-  onMouStatusChange,
+  mouLifecycle,
+  onMouLifecycleChange,
   cooperationMode,
   onCooperationModeChange,
   cooperationModeFilters = [],
-  hasMou,
-  onHasMouChange,
-  hasPitch,
-  onHasPitchChange,
-  dealClosed,
-  onDealClosedChange,
   dateFrom,
   onDateFromChange,
   dateTo,
   onDateToChange,
   sectors = [],
-  mouStatuses = [],
+  mouLifecycleStatuses = [],
   onClearAll,
   hasActiveFilters = false,
+  hideSectorFilter = false,
 }) {
   return (
     <div className="border-b border-slate-100 bg-green-50/40 px-4 py-4 sm:px-6">
@@ -116,44 +109,22 @@ export default function ProposalOpportunitiesFilterBar({
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-        <FilterSelect label="Sector" value={sector} onChange={onSectorChange}>
-          <option value="">All sectors</option>
-          {sectors.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </FilterSelect>
+        {!hideSectorFilter && (
+          <FilterSelect label="Sector" value={sector} onChange={onSectorChange}>
+            <option value="">All sectors</option>
+            {sectors.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </FilterSelect>
+        )}
 
-        <FilterSelect label="MOU status" value={mouStatus} onChange={onMouStatusChange}>
-          <option value="">All MOU statuses</option>
-          {mouStatuses.map((s) => (
-            <option key={s} value={s}>
-              {MM_MOU_STATUS_LABELS[s] || s.replace(/_/g, ' ')}
-            </option>
-          ))}
-        </FilterSelect>
-
-        <FilterSelect label="Has MOU" value={hasMou} onChange={onHasMouChange}>
-          {BOOL_FILTER_OPTIONS.map((o) => (
-            <option key={o.value || 'all'} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </FilterSelect>
-
-        <FilterSelect label="Has pitch" value={hasPitch} onChange={onHasPitchChange}>
-          {BOOL_FILTER_OPTIONS.map((o) => (
-            <option key={o.value || 'all'} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </FilterSelect>
-
-        <FilterSelect label="Deal closed" value={dealClosed} onChange={onDealClosedChange}>
-          {BOOL_FILTER_OPTIONS.map((o) => (
-            <option key={o.value || 'all'} value={o.value}>
-              {o.label}
+        <FilterSelect label="MOU Status" value={mouLifecycle} onChange={onMouLifecycleChange}>
+          <option value="">All</option>
+          {mouLifecycleStatuses.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
             </option>
           ))}
         </FilterSelect>
