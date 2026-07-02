@@ -6,6 +6,7 @@ import Alert from '../../components/Alert'
 import ProposalOpportunitiesFilterBar from '../../components/proposals/ProposalOpportunitiesFilterBar'
 import ProposalOpportunitiesPagination from '../../components/proposals/ProposalOpportunitiesPagination'
 import ProposalOpportunitiesTable from '../../components/proposals/ProposalOpportunitiesTable'
+import ProposalConferenceMouTable from '../../components/proposals/ProposalConferenceMouTable'
 import ProposalOpportunitiesToolbar from '../../components/proposals/ProposalOpportunitiesToolbar'
 import {
   buildCooperationModeFilters,
@@ -28,6 +29,11 @@ import StatCard from '../../components/StatCard'
 import { getPartyAProfilePaths } from '../../constants/profileRoutes'
 import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { getErrorMessage } from '../../utils/format'
+import {
+  conferenceShowsHistoricMouColumnsByKey,
+  getOpportunitiesDashboardHeader,
+  normalizeMouLifecycleStatuses,
+} from '../../utils/mouConferenceFields'
 
 const DEFAULT_PAGE_LIMIT = 20
 
@@ -100,10 +106,37 @@ export default function SectorLeadDashboard() {
     [filterOptions?.cooperation_modes],
   )
 
+  const scopedSector = filterOptions?.scoped_sector || user?.sector
+
   const selectedConference = useMemo(
     () => (filterOptions?.conferences || []).find((c) => c.key === conferenceFilter) || null,
     [filterOptions?.conferences, conferenceFilter],
   )
+
+  const mouLifecycleStatuses = useMemo(
+    () =>
+      normalizeMouLifecycleStatuses(filterOptions?.mou_lifecycle_statuses) ||
+      DEFAULT_MOU_LIFECYCLE_STATUSES,
+    [filterOptions?.mou_lifecycle_statuses],
+  )
+
+  const dashboardHeader = useMemo(
+    () =>
+      getOpportunitiesDashboardHeader({
+        selectedConference,
+        listScope: 'sector',
+        pageTitle: 'Sector Review Queue',
+        scopedSector,
+      }),
+    [selectedConference, scopedSector],
+  )
+
+  const showConferenceTable = conferenceShowsHistoricMouColumnsByKey(
+    conferenceFilter,
+    filterOptions?.conferences,
+  )
+
+  const listToolbarTitle = selectedConference ? dashboardHeader.title : 'Direct Opportunities'
 
   const listParams = useMemo(
     () =>
@@ -120,8 +153,6 @@ export default function SectorLeadDashboard() {
       }),
     [statusFilter, searchQuery, advancedFilters, cooperationModeFilter, conferenceFilter, page, limit],
   )
-
-  const scopedSector = filterOptions?.scoped_sector || user?.sector
 
   useEffect(() => {
     setPage(1)
@@ -270,42 +301,72 @@ export default function SectorLeadDashboard() {
     setAdvancedFilters((prev) => ({ ...prev, [key]: value }))
   }
 
+  const renderTableActions = (p) => (
+    <ActionGroup>
+      <IconButton variant="view" title="View details" onClick={() => handleView(p.id)}>
+        <ViewIcon />
+      </IconButton>
+      {p.party_a_id && (
+        <button
+          type="button"
+          title="View Party A Profile"
+          onClick={() => navigate(profilePaths.detail(p.party_a_id))}
+          className="rounded-lg border border-green-200 px-2 py-1 text-[11px] font-semibold text-green-800 hover:bg-green-50"
+        >
+          Profile
+        </button>
+      )}
+      {(p.status === 'submitted' || p.status === 'resubmitted') && (
+        <>
+          <IconButton variant="approve" title="Approve" onClick={() => openApprove(p)}>
+            <ApproveIcon />
+          </IconButton>
+          <IconButton variant="reject" title="Reject" onClick={() => openReject(p)}>
+            <RejectIcon />
+          </IconButton>
+        </>
+      )}
+    </ActionGroup>
+  )
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-green-700/20 bg-gradient-to-r from-green-800 to-green-700 p-5 text-white">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-green-100 ring-1 ring-white/25">
-            Sector Lead
-          </span>
-          <p className="text-xs font-semibold uppercase tracking-widest text-green-100/90">
-            Direct Opportunities
-          </p>
+          {dashboardHeader.badge && (
+            <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-green-100 ring-1 ring-white/25">
+              {dashboardHeader.badge}
+            </span>
+          )}
+          {dashboardHeader.eyebrow && (
+            <p className="text-xs font-semibold uppercase tracking-widest text-green-100/90">
+              {dashboardHeader.eyebrow}
+            </p>
+          )}
         </div>
-        <h3 className="mt-2 text-lg font-semibold">Sector Review Queue</h3>
-        <p className="mt-1 text-sm text-green-50/90">
-          Proposals in <strong>{scopedSector || 'your sector'}</strong> — approve, reject, and
-          monitor MOU progress. Matchmaking items are under{' '}
-          <strong>Matchmaking Review</strong> in the sidebar.
-        </p>
+        <h3 className="mt-2 text-lg font-semibold">{dashboardHeader.title}</h3>
+        <p className="mt-1 text-sm text-green-50/90">{dashboardHeader.description}</p>
       </div>
 
-      <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-900">
-        <p className="font-semibold">Matchmaking review</p>
-        <p className="mt-1">
-          <Link to="/matchmaking/forwarded" className="font-semibold text-portal-primary hover:underline">
-            Forwarded to me
-          </Link>
-          ,{' '}
-          <Link to="/matchmaking/board" className="font-semibold text-portal-primary hover:underline">
-            Matching board
-          </Link>
-          ,{' '}
-          <Link to="/matchmaking/matches" className="font-semibold text-portal-primary hover:underline">
-            Matches
-          </Link>
-          .
-        </p>
-      </div>
+      {dashboardHeader.showMatchmakingLinks && (
+        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-900">
+          <p className="font-semibold">Matchmaking review</p>
+          <p className="mt-1">
+            <Link to="/matchmaking/forwarded" className="font-semibold text-portal-primary hover:underline">
+              Forwarded to me
+            </Link>
+            ,{' '}
+            <Link to="/matchmaking/board" className="font-semibold text-portal-primary hover:underline">
+              Matching board
+            </Link>
+            ,{' '}
+            <Link to="/matchmaking/matches" className="font-semibold text-portal-primary hover:underline">
+              Matches
+            </Link>
+            .
+          </p>
+        </div>
+      )}
 
       <Alert type="error" message={error} onClose={() => setError('')} />
       <Alert type="success" message={success} onClose={() => setSuccess('')} />
@@ -324,7 +385,7 @@ export default function SectorLeadDashboard() {
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <ProposalOpportunitiesToolbar
-          title="Direct Opportunities"
+          title={listToolbarTitle}
           search={searchInput}
           onSearchChange={setSearchInput}
           statusFilters={PROPOSAL_STATUS_FILTERS.sectorLead}
@@ -346,56 +407,40 @@ export default function SectorLeadDashboard() {
           onDateFromChange={(v) => setAdvanced('dateFrom', v)}
           dateTo={advancedFilters.dateTo}
           onDateToChange={(v) => setAdvanced('dateTo', v)}
-          mouLifecycleStatuses={filterOptions?.mou_lifecycle_statuses || DEFAULT_MOU_LIFECYCLE_STATUSES}
+          mouLifecycleStatuses={mouLifecycleStatuses}
           hideSectorFilter
           onClearAll={clearAllFilters}
           hasActiveFilters={hasActiveFilters || Boolean(statusFilter)}
         />
 
-        <ProposalOpportunitiesTable
-          proposals={proposals}
-          loading={loading}
-          emptyMessage={emptyMessage}
-          showCooperationMode
-          showMouLifecycle
-          showDocumentLinks={false}
-          onView={handleView}
-          onOpenFile={openFile}
-          renderStatusExtra={(p) =>
-            p.status === 'resubmitted' && (p.resubmit_count ?? 0) > 1 ? (
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
-                ×{p.resubmit_count}
-              </span>
-            ) : null
-          }
-          renderActions={(p) => (
-            <ActionGroup>
-              <IconButton variant="view" title="View details" onClick={() => handleView(p.id)}>
-                <ViewIcon />
-              </IconButton>
-              {p.party_a_id && (
-                <button
-                  type="button"
-                  title="View Party A Profile"
-                  onClick={() => navigate(profilePaths.detail(p.party_a_id))}
-                  className="rounded-lg border border-green-200 px-2 py-1 text-[11px] font-semibold text-green-800 hover:bg-green-50"
-                >
-                  Profile
-                </button>
-              )}
-              {(p.status === 'submitted' || p.status === 'resubmitted') && (
-                <>
-                  <IconButton variant="approve" title="Approve" onClick={() => openApprove(p)}>
-                    <ApproveIcon />
-                  </IconButton>
-                  <IconButton variant="reject" title="Reject" onClick={() => openReject(p)}>
-                    <RejectIcon />
-                  </IconButton>
-                </>
-              )}
-            </ActionGroup>
-          )}
-        />
+        {showConferenceTable ? (
+          <ProposalConferenceMouTable
+            proposals={proposals}
+            loading={loading}
+            emptyMessage={emptyMessage}
+            onView={handleView}
+            renderActions={renderTableActions}
+          />
+        ) : (
+          <ProposalOpportunitiesTable
+            proposals={proposals}
+            loading={loading}
+            emptyMessage={emptyMessage}
+            showCooperationMode
+            showMouLifecycle
+            showDocumentLinks={false}
+            onView={handleView}
+            onOpenFile={openFile}
+            renderStatusExtra={(p) =>
+              p.status === 'resubmitted' && (p.resubmit_count ?? 0) > 1 ? (
+                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                  ×{p.resubmit_count}
+                </span>
+              ) : null
+            }
+            renderActions={renderTableActions}
+          />
+        )}
 
         <ProposalOpportunitiesPagination
           pagination={pagination}

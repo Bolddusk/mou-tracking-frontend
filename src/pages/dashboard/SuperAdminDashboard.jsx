@@ -18,6 +18,7 @@ import StatCard from '../../components/StatCard'
 import ProposalOpportunitiesFilterBar from '../../components/proposals/ProposalOpportunitiesFilterBar'
 import ProposalOpportunitiesPagination from '../../components/proposals/ProposalOpportunitiesPagination'
 import ProposalOpportunitiesTable from '../../components/proposals/ProposalOpportunitiesTable'
+import ProposalConferenceMouTable from '../../components/proposals/ProposalConferenceMouTable'
 import ProposalOpportunitiesToolbar from '../../components/proposals/ProposalOpportunitiesToolbar'
 import {
   buildCooperationModeFilters,
@@ -29,6 +30,11 @@ import {
 } from '../../constants/proposalFilters'
 import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { getErrorMessage } from '../../utils/format'
+import {
+  conferenceShowsHistoricMouColumnsByKey,
+  getOpportunitiesDashboardHeader,
+  normalizeMouLifecycleStatuses,
+} from '../../utils/mouConferenceFields'
 import { getOpportunitiesNavLabel, getProposalsListScope } from '../../utils/rbac'
 import { loadDraftFromProposal } from '../../utils/proposalDraft'
 
@@ -99,6 +105,33 @@ export default function SuperAdminDashboard() {
     () => (filterOptions?.conferences || []).find((c) => c.key === conferenceFilter) || null,
     [filterOptions?.conferences, conferenceFilter],
   )
+
+  const mouLifecycleStatuses = useMemo(
+    () =>
+      normalizeMouLifecycleStatuses(filterOptions?.mou_lifecycle_statuses) ||
+      DEFAULT_MOU_LIFECYCLE_STATUSES,
+    [filterOptions?.mou_lifecycle_statuses],
+  )
+
+  const dashboardHeader = useMemo(
+    () =>
+      getOpportunitiesDashboardHeader({
+        selectedConference,
+        listScope,
+        pageTitle,
+        scopedSector: rbac?.context?.scoped_sector || filterOptions?.scoped_sector,
+      }),
+    [selectedConference, listScope, pageTitle, rbac, filterOptions?.scoped_sector],
+  )
+
+  const showConferenceTable = conferenceShowsHistoricMouColumnsByKey(
+    conferenceFilter,
+    filterOptions?.conferences,
+  )
+
+  const listToolbarTitle = selectedConference
+    ? dashboardHeader.title
+    : pageTitle
 
   const listParams = useMemo(() => {
     const base = buildProposalListParams({
@@ -287,34 +320,53 @@ export default function SuperAdminDashboard() {
     setAdvancedFilters((prev) => ({ ...prev, [key]: value }))
   }
 
+  const renderTableActions = (p) => (
+    <ActionGroup>
+      <IconButton variant="view" title="View details" onClick={() => handleView(p.id)}>
+        <ViewIcon />
+      </IconButton>
+      {p.status === 'draft' && (
+        <IconButton
+          variant="edit"
+          title="Edit MOUS — Party A steps + MOU detail (Step 11)"
+          onClick={() => handleEditMous(p)}
+        >
+          <EditIcon />
+        </IconButton>
+      )}
+      {(p.status === 'submitted' || p.status === 'resubmitted') && (
+        <>
+          <IconButton variant="approve" title="Approve" onClick={() => openApprove(p)}>
+            <ApproveIcon />
+          </IconButton>
+          <IconButton variant="reject" title="Reject" onClick={() => openReject(p)}>
+            <RejectIcon />
+          </IconButton>
+        </>
+      )}
+    </ActionGroup>
+  )
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-green-700/20 bg-gradient-to-r from-green-800 to-green-700 p-5 text-white">
         <div className="flex flex-wrap items-center gap-2">
-          {listScope === 'all' && (
+          {dashboardHeader.badge && (
             <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-green-100 ring-1 ring-white/25">
-              Super Admin
+              {dashboardHeader.badge}
             </span>
           )}
-          <p className="text-xs font-semibold uppercase tracking-widest text-green-100/90">
-            {listScope === 'sector'
-              ? 'Sector Opportunities'
-              : listScope === 'own'
-                ? 'My Opportunities'
-                : 'Direct Opportunities'}
-          </p>
+          {dashboardHeader.eyebrow && (
+            <p className="text-xs font-semibold uppercase tracking-widest text-green-100/90">
+              {dashboardHeader.eyebrow}
+            </p>
+          )}
         </div>
-        <h3 className="mt-2 text-lg font-semibold">{pageTitle}</h3>
-        <p className="mt-1 text-sm text-green-50/90">
-          {listScope === 'all'
-            ? 'Legacy proposals across all sectors — approve, reject, and monitor. To create a new MOUS, use Add MOUS on the MOUS page in the sidebar.'
-            : listScope === 'sector'
-              ? `Proposals in ${rbac?.context?.scoped_sector || filterOptions?.scoped_sector || 'your sector'} — open any listed MOU without permission errors.`
-              : 'Your proposals — only MOUs you can access are listed here.'}
-        </p>
+        <h3 className="mt-2 text-lg font-semibold">{dashboardHeader.title}</h3>
+        <p className="mt-1 text-sm text-green-50/90">{dashboardHeader.description}</p>
       </div>
 
-      {listScope === 'all' && (
+      {dashboardHeader.showSuperAdminExtras && (
         <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-900">
           <p className="font-semibold">Matchmaking create (on behalf)</p>
           <p className="mt-1">
@@ -351,7 +403,7 @@ export default function SuperAdminDashboard() {
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <ProposalOpportunitiesToolbar
-          title={pageTitle}
+          title={listToolbarTitle}
           search={searchInput}
           onSearchChange={setSearchInput}
           statusFilters={statusFilters}
@@ -376,48 +428,33 @@ export default function SuperAdminDashboard() {
           dateTo={advancedFilters.dateTo}
           onDateToChange={(v) => setAdvanced('dateTo', v)}
           sectors={filterOptions?.sectors || []}
-          mouLifecycleStatuses={filterOptions?.mou_lifecycle_statuses || DEFAULT_MOU_LIFECYCLE_STATUSES}
+          mouLifecycleStatuses={mouLifecycleStatuses}
           hideSectorFilter={listScope !== 'all'}
           onClearAll={clearAllFilters}
           hasActiveFilters={hasActiveFilters || Boolean(statusFilter)}
         />
 
-        <ProposalOpportunitiesTable
-          proposals={proposals}
-          loading={loading}
-          emptyMessage={emptyMessage}
-          showCooperationMode
-          showMouLifecycle
-          showDocumentLinks={false}
-          onView={handleView}
-          onOpenFile={openFile}
-          renderActions={(p) => (
-            <ActionGroup>
-              <IconButton variant="view" title="View details" onClick={() => handleView(p.id)}>
-                <ViewIcon />
-              </IconButton>
-              {p.status === 'draft' && (
-                <IconButton
-                  variant="edit"
-                  title="Edit MOUS — Party A steps + MOU detail (Step 11)"
-                  onClick={() => handleEditMous(p)}
-                >
-                  <EditIcon />
-                </IconButton>
-              )}
-              {(p.status === 'submitted' || p.status === 'resubmitted') && (
-                          <>
-                            <IconButton variant="approve" title="Approve" onClick={() => openApprove(p)}>
-                              <ApproveIcon />
-                            </IconButton>
-                            <IconButton variant="reject" title="Reject" onClick={() => openReject(p)}>
-                              <RejectIcon />
-                            </IconButton>
-                          </>
-                        )}
-            </ActionGroup>
-          )}
-        />
+        {showConferenceTable ? (
+          <ProposalConferenceMouTable
+            proposals={proposals}
+            loading={loading}
+            emptyMessage={emptyMessage}
+            onView={handleView}
+            renderActions={renderTableActions}
+          />
+        ) : (
+          <ProposalOpportunitiesTable
+            proposals={proposals}
+            loading={loading}
+            emptyMessage={emptyMessage}
+            showCooperationMode
+            showMouLifecycle
+            showDocumentLinks={false}
+            onView={handleView}
+            onOpenFile={openFile}
+            renderActions={renderTableActions}
+          />
+        )}
 
         <ProposalOpportunitiesPagination
           pagination={pagination}

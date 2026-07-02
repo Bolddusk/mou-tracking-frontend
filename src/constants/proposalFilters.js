@@ -27,7 +27,6 @@ export const PROPOSAL_STATUS_FILTERS = {
     { key: 'rejected', label: 'Rejected' },
   ],
 }
-
 export function filterProposalsByStatus(proposals, statusKey) {
   if (!statusKey) return proposals
   return proposals.filter((p) => (p.status || '').toLowerCase() === statusKey)
@@ -81,7 +80,7 @@ export const COOPERATION_MODE_LABELS = {
 export const DEFAULT_MOU_LIFECYCLE_STATUSES = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
-  { value: 'execution', label: 'Execution' },
+  { value: 'execution', label: 'In Execution' },
 ]
 
 const DEFAULT_COOPERATION_MODES = ['mou', 'jv', 'agreement']

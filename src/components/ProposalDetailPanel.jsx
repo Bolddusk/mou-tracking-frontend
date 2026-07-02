@@ -1,4 +1,5 @@
 import DocLink from './DocLink'
+import MouConferenceDetailsSection from './proposal/MouConferenceDetailsSection'
 import StatusBadge from './StatusBadge'
 import {
   ENGAGEMENT_TYPES,
@@ -10,7 +11,7 @@ import {
 import { resolveFileUrl } from '../utils/format'
 import { formatDate } from '../utils/format'
 
-export default function ProposalDetailPanel({ proposal, onOpenFile }) {
+export default function ProposalDetailPanel({ proposal, onOpenFile, conferences = [] }) {
   if (!proposal) return null
 
   const open = (url, title) => onOpenFile?.(url, title)
@@ -39,6 +40,8 @@ export default function ProposalDetailPanel({ proposal, onOpenFile }) {
           )}
         </div>
       )}
+
+      <MouConferenceDetailsSection proposal={proposal} conferences={conferences} />
 
       <Section title="Engagement & Conference">
         <GridFields

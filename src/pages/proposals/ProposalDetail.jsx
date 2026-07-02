@@ -75,6 +75,7 @@ export default function ProposalDetail() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [proposal, setProposal] = useState(null)
+  const [conferences, setConferences] = useState([])
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -320,6 +321,21 @@ export default function ProposalDetail() {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    let cancelled = false
+    proposalsApi
+      .getProposalFilterOptions()
+      .then((data) => {
+        if (!cancelled) setConferences(data?.conferences || [])
+      })
+      .catch(() => {
+        if (!cancelled) setConferences([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (activities.length === 0) {
@@ -915,6 +931,7 @@ export default function ProposalDetail() {
 
           <ProposalDetailPanel
             proposal={proposal}
+            conferences={conferences}
             onOpenFile={(url, title) => setFilePreview({ url, title })}
           />
         </>
