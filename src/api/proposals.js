@@ -1,4 +1,28 @@
 import client from './client'
+import { getProposalsListApi, PROPOSALS_LIST_API } from '../utils/rbac'
+
+function normalizePaginatedListResponse(body, params = {}) {
+  if (Array.isArray(body)) {
+    return {
+      data: body,
+      pagination: {
+        page: 1,
+        limit: body.length,
+        total: body.length,
+        total_pages: 1,
+        has_next: false,
+        has_prev: false,
+      },
+      filters: {},
+    }
+  }
+
+  return {
+    data: Array.isArray(body?.data) ? body.data : [],
+    pagination: body?.pagination ?? null,
+    filters: body?.filters ?? {},
+  }
+}
 
 export async function saveDraft(data) {
   const response = await client.post('/api/proposals/draft', data)
@@ -26,9 +50,32 @@ export async function uploadFile(file, fieldName) {
   return response.data
 }
 
+export async function getMyProposalsPaginated(params = {}) {
+  const resolved =
+    typeof params === 'string' ? (params ? { status: params } : {}) : params || {}
+  const response = await client.get('/api/proposals/my', { params: resolved })
+  return normalizePaginatedListResponse(response.data, resolved)
+}
+
 export async function getMyProposals() {
-  const response = await client.get('/api/proposals/my')
-  return response.data
+  const { data } = await getMyProposalsPaginated()
+  return data
+}
+
+export async function getProposalsListPaginatedByPath(apiPath, params = {}) {
+  const resolved =
+    typeof params === 'string' ? (params ? { status: params } : {}) : params || {}
+  const response = await client.get(apiPath, { params: resolved })
+  return normalizePaginatedListResponse(response.data, resolved)
+}
+
+/**
+ * Opportunities list — uses rbac.capabilities.proposals_list_api from GET /api/auth/me.
+ * Never hardcode /api/proposals/all; missing rbac defaults to scoped /my (safe).
+ */
+export async function getOpportunitiesListPaginated(params, rbac) {
+  const apiPath = rbac ? getProposalsListApi(rbac) : PROPOSALS_LIST_API.OWN
+  return getProposalsListPaginatedByPath(apiPath, params)
 }
 
 export async function deleteProposal(id) {

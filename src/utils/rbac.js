@@ -113,7 +113,10 @@ export function buildSidebarNavigation(rbac) {
       if (!perm.path || !can(rbac, perm.key)) continue
       items.push({
         key: perm.navKey || perm.key,
-        label: perm.label,
+        label:
+          perm.key === 'nav.opportunities.all'
+            ? getOpportunitiesNavLabel(rbac, perm.label)
+            : perm.label,
         path: perm.path,
         permission: perm.key,
         ...(perm.end ? { end: true } : {}),
@@ -265,4 +268,43 @@ export function parseAdminRolesList(data) {
   if (Array.isArray(data?.roles)) return data.roles
   if (Array.isArray(data)) return data
   return []
+}
+
+export const PROPOSALS_LIST_API = {
+  ALL: '/api/proposals/all',
+  SECTOR: '/api/proposals/sector-lead',
+  OWN: '/api/proposals/my',
+}
+
+/** Resolved list endpoint from GET /api/auth/me — capabilities first, then context. */
+export function getProposalsListApi(rbac) {
+  const fromCapabilities = rbac?.capabilities?.proposals_list_api
+  if (fromCapabilities) return fromCapabilities
+
+  const fromContext = rbac?.context?.proposals_list_api
+  if (fromContext) return fromContext
+
+  const scope = rbac?.context?.list_scope
+  if (scope === 'all') return PROPOSALS_LIST_API.ALL
+  if (scope === 'sector') return PROPOSALS_LIST_API.SECTOR
+  return PROPOSALS_LIST_API.OWN
+}
+
+/** `all` | `sector` | `own` — drives filters and list params. */
+export function getProposalsListScope(rbac) {
+  const scope = rbac?.context?.list_scope
+  if (scope === 'all' || scope === 'sector' || scope === 'own') return scope
+
+  const api = getProposalsListApi(rbac)
+  if (api === PROPOSALS_LIST_API.ALL) return 'all'
+  if (api === PROPOSALS_LIST_API.SECTOR) return 'sector'
+  return 'own'
+}
+
+/** Same nav permission (`nav.opportunities.all`), scope-aware label for sidebar/page. */
+export function getOpportunitiesNavLabel(rbac, fallback = 'All Opportunities') {
+  const scope = getProposalsListScope(rbac)
+  if (scope === 'own') return 'My Opportunities'
+  if (scope === 'sector') return 'Sector Opportunities'
+  return fallback
 }

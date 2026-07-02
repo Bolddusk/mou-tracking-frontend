@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import * as proposalsApi from '../../api/proposals'
 import Alert from '../../components/Alert'
 import {
@@ -21,12 +22,14 @@ import ProposalOpportunitiesToolbar from '../../components/proposals/ProposalOpp
 import {
   buildCooperationModeFilters,
   buildProposalListParams,
+  buildSectorLeadListParams,
   DEFAULT_MOU_LIFECYCLE_STATUSES,
   getProposalListEmptyMessage,
   PROPOSAL_STATUS_FILTERS,
 } from '../../constants/proposalFilters'
 import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { getErrorMessage } from '../../utils/format'
+import { getOpportunitiesNavLabel, getProposalsListScope } from '../../utils/rbac'
 import { loadDraftFromProposal } from '../../utils/proposalDraft'
 
 const DEFAULT_PAGE_LIMIT = 20
@@ -40,6 +43,9 @@ const EMPTY_ADVANCED_FILTERS = {
 
 export default function SuperAdminDashboard() {
   const navigate = useNavigate()
+  const { rbac } = useAuth()
+  const listScope = useMemo(() => getProposalsListScope(rbac), [rbac])
+  const pageTitle = useMemo(() => getOpportunitiesNavLabel(rbac), [rbac])
   const [statusFilter, setStatusFilter] = useState('')
   const [cooperationModeFilter, setCooperationModeFilter] = useState('')
   const [conferenceFilter, setConferenceFilter] = useState('')
@@ -94,22 +100,38 @@ export default function SuperAdminDashboard() {
     [filterOptions?.conferences, conferenceFilter],
   )
 
-  const listParams = useMemo(
-    () =>
-      buildProposalListParams({
-        status: statusFilter,
-        sector: advancedFilters.sector,
-        mou_lifecycle: advancedFilters.mouLifecycle,
-        cooperation_mode: cooperationModeFilter,
-        conference_key: conferenceFilter,
-        q: searchQuery,
-        date_from: advancedFilters.dateFrom,
-        date_to: advancedFilters.dateTo,
-        page,
-        limit,
-      }),
-    [statusFilter, searchQuery, advancedFilters, cooperationModeFilter, conferenceFilter, page, limit],
-  )
+  const listParams = useMemo(() => {
+    const base = buildProposalListParams({
+      status: statusFilter,
+      sector: advancedFilters.sector,
+      mou_lifecycle: advancedFilters.mouLifecycle,
+      cooperation_mode: cooperationModeFilter,
+      conference_key: conferenceFilter,
+      q: searchQuery,
+      date_from: advancedFilters.dateFrom,
+      date_to: advancedFilters.dateTo,
+      page,
+      limit,
+    })
+    if (listScope === 'sector') return buildSectorLeadListParams(base)
+    if (listScope === 'own') return buildSectorLeadListParams(base)
+    return base
+  }, [
+    statusFilter,
+    searchQuery,
+    advancedFilters,
+    cooperationModeFilter,
+    conferenceFilter,
+    page,
+    limit,
+    listScope,
+  ])
+
+  const statusFilters = useMemo(() => {
+    if (listScope === 'sector') return PROPOSAL_STATUS_FILTERS.sectorLead
+    if (listScope === 'own') return PROPOSAL_STATUS_FILTERS.partyA
+    return PROPOSAL_STATUS_FILTERS.superAdmin
+  }, [listScope])
 
   useEffect(() => {
     setPage(1)
@@ -117,20 +139,23 @@ export default function SuperAdminDashboard() {
 
   const loadStats = useCallback(async () => {
     try {
-      const result = await proposalsApi.getAllProposalsPaginated({ limit: 100, page: 1 })
+      const result = await proposalsApi.getOpportunitiesListPaginated(
+        { limit: 100, page: 1 },
+        rbac,
+      )
       setStatsProposals(result.data)
       setStatsTotal(result.pagination?.total ?? result.data.length)
     } catch {
       setStatsProposals([])
       setStatsTotal(0)
     }
-  }, [])
+  }, [rbac])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const result = await proposalsApi.getAllProposalsPaginated(listParams)
+      const result = await proposalsApi.getOpportunitiesListPaginated(listParams, rbac)
       setProposals(result.data)
       setPagination(result.pagination)
     } catch (err) {
@@ -140,7 +165,7 @@ export default function SuperAdminDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [listParams])
+  }, [listParams, rbac])
 
   useEffect(() => {
     loadStats()
@@ -174,7 +199,7 @@ export default function SuperAdminDashboard() {
     totalCount: pagination?.total ?? proposals.length,
     statusFilter,
     searchQuery,
-    statusFilters: PROPOSAL_STATUS_FILTERS.superAdmin,
+    statusFilters,
     defaultMessage: hasActiveFilters
       ? 'No opportunities match the current filters.'
       : 'No opportunities found.',
@@ -266,41 +291,52 @@ export default function SuperAdminDashboard() {
     <div className="space-y-6">
       <div className="rounded-xl border border-green-700/20 bg-gradient-to-r from-green-800 to-green-700 p-5 text-white">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-green-100 ring-1 ring-white/25">
-            Super Admin
-          </span>
+          {listScope === 'all' && (
+            <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-green-100 ring-1 ring-white/25">
+              Super Admin
+            </span>
+          )}
           <p className="text-xs font-semibold uppercase tracking-widest text-green-100/90">
-            Direct Opportunities
+            {listScope === 'sector'
+              ? 'Sector Opportunities'
+              : listScope === 'own'
+                ? 'My Opportunities'
+                : 'Direct Opportunities'}
           </p>
         </div>
-        <h3 className="mt-2 text-lg font-semibold">All Opportunities</h3>
+        <h3 className="mt-2 text-lg font-semibold">{pageTitle}</h3>
         <p className="mt-1 text-sm text-green-50/90">
-          Legacy proposals across all sectors — approve, reject, and monitor. To create a new MOUS,
-          use <strong>Add MOUS</strong> on the <strong>MOUS</strong> page in the sidebar.
+          {listScope === 'all'
+            ? 'Legacy proposals across all sectors — approve, reject, and monitor. To create a new MOUS, use Add MOUS on the MOUS page in the sidebar.'
+            : listScope === 'sector'
+              ? `Proposals in ${rbac?.context?.scoped_sector || filterOptions?.scoped_sector || 'your sector'} — open any listed MOU without permission errors.`
+              : 'Your proposals — only MOUs you can access are listed here.'}
         </p>
       </div>
 
-      <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-900">
-        <p className="font-semibold">Matchmaking create (on behalf)</p>
-        <p className="mt-1">
-          <Link to="/matchmaking/new" className="font-semibold text-portal-primary hover:underline">
-            New Proposal
-          </Link>{' '}
-          — select owner on first save. Lists:{' '}
-          <Link to="/matchmaking/admin/my-proposals" className="font-semibold text-portal-primary hover:underline">
-            All proposals
-          </Link>
-          ,{' '}
-          <Link to="/matchmaking/admin/focal-point" className="font-semibold text-portal-primary hover:underline">
-            Review queue
-          </Link>
-          . Direct MOUS with Party B:{' '}
-          <Link to="/proposals/new" className="font-semibold text-portal-primary hover:underline">
-            MOUS → Add MOUS
-          </Link>
-          .
-        </p>
-      </div>
+      {listScope === 'all' && (
+        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-900">
+          <p className="font-semibold">Matchmaking create (on behalf)</p>
+          <p className="mt-1">
+            <Link to="/matchmaking/new" className="font-semibold text-portal-primary hover:underline">
+              New Proposal
+            </Link>{' '}
+            — select owner on first save. Lists:{' '}
+            <Link to="/matchmaking/admin/my-proposals" className="font-semibold text-portal-primary hover:underline">
+              All proposals
+            </Link>
+            ,{' '}
+            <Link to="/matchmaking/admin/focal-point" className="font-semibold text-portal-primary hover:underline">
+              Review queue
+            </Link>
+            . Direct MOUS with Party B:{' '}
+            <Link to="/proposals/new" className="font-semibold text-portal-primary hover:underline">
+              MOUS → Add MOUS
+            </Link>
+            .
+          </p>
+        </div>
+      )}
 
       <Alert type="error" message={error} onClose={() => setError('')} />
       <Alert type="success" message={success} onClose={() => setSuccess('')} />
@@ -315,10 +351,10 @@ export default function SuperAdminDashboard() {
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <ProposalOpportunitiesToolbar
-          title="Direct Opportunities"
+          title={pageTitle}
           search={searchInput}
           onSearchChange={setSearchInput}
-          statusFilters={PROPOSAL_STATUS_FILTERS.superAdmin}
+          statusFilters={statusFilters}
           statusValue={statusFilter}
           onStatusChange={setStatusFilter}
         />
@@ -341,6 +377,7 @@ export default function SuperAdminDashboard() {
           onDateToChange={(v) => setAdvanced('dateTo', v)}
           sectors={filterOptions?.sectors || []}
           mouLifecycleStatuses={filterOptions?.mou_lifecycle_statuses || DEFAULT_MOU_LIFECYCLE_STATUSES}
+          hideSectorFilter={listScope !== 'all'}
           onClearAll={clearAllFilters}
           hasActiveFilters={hasActiveFilters || Boolean(statusFilter)}
         />
