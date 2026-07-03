@@ -6,6 +6,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import { getPartyAProfilePaths, getProfileAccessError } from '../../constants/profileRoutes'
 import { useAuth } from '../../context/AuthContext'
 import { formatDate, getErrorMessage, resolveFileUrl } from '../../utils/format'
+import PartyAProfile from './PartyAProfile'
 
 function ViewDocButton({ url, label = 'View Document' }) {
   if (!url) {
@@ -91,8 +92,33 @@ export default function PartyAProfileView() {
     )
   }
 
-  const profile = data?.profile || {}
+  const canEdit = data?.can_edit === true
   const account = data?.user || {}
+
+  if (canEdit) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div>
+          <Link
+            to={paths.list}
+            className="text-sm font-medium text-portal-primary hover:underline"
+          >
+            ← Back to {paths.listLabel}
+          </Link>
+          <div className="mt-3">
+            <h3 className="text-lg font-semibold text-slate-800">Party A Profile</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              {account.full_name || '—'}
+              {account.email ? ` · ${account.email}` : ''}
+            </p>
+          </div>
+        </div>
+        <PartyAProfile staffUserId={userId} />
+      </div>
+    )
+  }
+
+  const profile = data?.profile || {}
   const completion = data?.completion || {}
   const documents = data?.documents || []
   const completionPct = completion.completion_pct ?? 0

@@ -77,9 +77,11 @@ function applyProfileData(data, setForm, setCompletion, setAvailableSectors) {
   }
 }
 
-export default function PartyAProfile() {
+export default function PartyAProfile({ staffUserId = null }) {
+  const isStaffEdit = Boolean(staffUserId)
   const [searchParams, setSearchParams] = useSearchParams()
-  const activeTab = searchParams.get('tab') === 'compliance' ? 'compliance' : 'profile'
+  const activeTab =
+    !isStaffEdit && searchParams.get('tab') === 'compliance' ? 'compliance' : 'profile'
 
   const setTab = (tab) => {
     setSearchParams(tab === 'profile' ? {} : { tab })
@@ -105,7 +107,9 @@ export default function PartyAProfile() {
   const loadProfile = useCallback(async () => {
     setError('')
     try {
-      const data = await profileApi.getProfile()
+      const data = isStaffEdit
+        ? await profileApi.getProfileByUserId(staffUserId)
+        : await profileApi.getProfile()
       applyProfileData(data, setForm, setCompletion, setAvailableSectors)
 
       if (!data.available_sectors?.length) {
@@ -121,7 +125,7 @@ export default function PartyAProfile() {
     } catch (err) {
       setError(getErrorMessage(err))
     }
-  }, [])
+  }, [isStaffEdit, staffUserId])
 
   useEffect(() => {
     async function init() {
@@ -152,7 +156,9 @@ export default function PartyAProfile() {
     setError('')
     setSuccess('')
     try {
-      const data = await profileApi.updateProfile(formToPayload(form))
+      const data = isStaffEdit
+        ? await profileApi.updatePartyAProfileByUserId(staffUserId, formToPayload(form))
+        : await profileApi.updateProfile(formToPayload(form))
       applyProfileData(data, setForm, setCompletion, setAvailableSectors)
       setSuccess(data.message || 'Profile updated')
     } catch (err) {
@@ -168,7 +174,9 @@ export default function PartyAProfile() {
     setError('')
     setSuccess('')
     try {
-      const data = await profileApi.uploadProfileDocument({ file, docType })
+      const data = isStaffEdit
+        ? await profileApi.uploadPartyAProfileDocumentByUserId(staffUserId, { file, docType })
+        : await profileApi.uploadProfileDocument({ file, docType })
       applyProfileData(data, setForm, setCompletion, setAvailableSectors)
       setSuccess(`${docType === 'fbr_certificate' ? 'FBR' : 'SECP'} certificate uploaded`)
     } catch (err) {
@@ -185,12 +193,19 @@ export default function PartyAProfile() {
     setError('')
     setSuccess('')
     try {
-      const data = await profileApi.uploadProfileDocument({
-        file: otherForm.file,
-        docType: 'other',
-        title: otherForm.title.trim(),
-        description: otherForm.description.trim() || undefined,
-      })
+      const data = isStaffEdit
+        ? await profileApi.uploadPartyAProfileDocumentByUserId(staffUserId, {
+            file: otherForm.file,
+            docType: 'other',
+            title: otherForm.title.trim(),
+            description: otherForm.description.trim() || undefined,
+          })
+        : await profileApi.uploadProfileDocument({
+            file: otherForm.file,
+            docType: 'other',
+            title: otherForm.title.trim(),
+            description: otherForm.description.trim() || undefined,
+          })
       applyProfileData(data, setForm, setCompletion, setAvailableSectors)
       setOtherForm({ title: '', description: '', file: null })
       setSuccess('Document uploaded')
@@ -207,7 +222,9 @@ export default function PartyAProfile() {
     setError('')
     setSuccess('')
     try {
-      const data = await profileApi.deleteProfileDocument(id)
+      const data = isStaffEdit
+        ? await profileApi.deletePartyAProfileDocumentByUserId(staffUserId, id)
+        : await profileApi.deleteProfileDocument(id)
       applyProfileData(data, setForm, setCompletion, setAvailableSectors)
       setSuccess('Document deleted')
     } catch (err) {
@@ -236,37 +253,42 @@ export default function PartyAProfile() {
       <div>
         <h3 className="text-lg font-semibold text-slate-800">Company Profile</h3>
         <p className="text-sm text-slate-500">
-          {activeTab === 'profile'
-            ? 'Complete your company profile and upload mandatory certificates.'
-            : 'Upload audit reports and SECP annual returns for the last 3 calendar years.'}
+          {isStaffEdit
+            ? 'Update company profile and mandatory certificates for this Party A account.'
+            : activeTab === 'profile'
+              ? 'Complete your company profile and upload mandatory certificates.'
+              : 'Upload audit reports and SECP annual returns for the last 3 calendar years.'}
         </p>
-        <p className="mt-1 text-xs text-slate-400">
-          Account settings (name, email) are in{' '}
-          <Link to="/profile" className="font-medium text-portal-primary hover:underline">
-            My Profile
-          </Link>
-          .
-        </p>
+        {!isStaffEdit && (
+          <p className="mt-1 text-xs text-slate-400">
+            Account settings (name, email) are in{' '}
+            <Link to="/profile" className="font-medium text-portal-primary hover:underline">
+              My Profile
+            </Link>
+            .
+          </p>
+        )}
       </div>
 
       <Alert type="error" message={error} onClose={() => setError('')} />
       <Alert type="success" message={success} onClose={() => setSuccess('')} />
 
       <div className="flex gap-1 border-b border-slate-200">
-        {PROFILE_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setTab(tab.key)}
-            className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? 'border-b-2 border-portal-primary text-portal-primary'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {!isStaffEdit &&
+          PROFILE_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setTab(tab.key)}
+              className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? 'border-b-2 border-portal-primary text-portal-primary'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
       </div>
 
       {activeTab === 'compliance' ? (

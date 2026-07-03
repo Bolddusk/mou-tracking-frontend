@@ -165,7 +165,7 @@ export default function PartyProfileSnapshotCard({
               </div>
             )}
 
-            {data.read_only && (
+            {data.read_only && data.can_edit !== true && (
               <p className="text-[10px] text-slate-400">Read-only snapshot from linked account</p>
             )}
           </>

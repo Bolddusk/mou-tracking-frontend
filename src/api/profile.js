@@ -43,6 +43,29 @@ export async function getProfileByUserId(userId) {
   return response.data
 }
 
+export async function updatePartyAProfileByUserId(userId, payload) {
+  const response = await client.patch(`/api/profile/party-a/${userId}`, payload)
+  return response.data
+}
+
+export async function uploadPartyAProfileDocumentByUserId(userId, { file, docType, title, description }) {
+  const formData = new FormData()
+  formData.append('document', file)
+  formData.append('doc_type', docType)
+  if (title) formData.append('title', title)
+  if (description) formData.append('description', description)
+
+  const response = await client.post(`/api/profile/party-a/${userId}/documents`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return response.data
+}
+
+export async function deletePartyAProfileDocumentByUserId(userId, docId) {
+  const response = await client.delete(`/api/profile/party-a/${userId}/documents/${docId}`)
+  return response.data
+}
+
 export async function getPartyBProfile() {
   const response = await client.get('/api/profile/party-b')
   return response.data
@@ -78,5 +101,28 @@ export async function getPartyBProfiles() {
 
 export async function getPartyBProfileByUserId(userId) {
   const response = await client.get(`/api/profile/party-b/${userId}`)
+  return response.data
+}
+
+export async function updatePartyBProfileByUserId(userId, payload) {
+  const response = await client.patch(`/api/profile/party-b/${userId}`, payload)
+  return response.data
+}
+
+export async function uploadPartyBProfileDocumentByUserId(userId, { file, docType, title, description }) {
+  const formData = new FormData()
+  formData.append('document', file)
+  formData.append('doc_type', docType)
+  if (title) formData.append('title', title)
+  if (description) formData.append('description', description)
+
+  const response = await client.post(`/api/profile/party-b/${userId}/documents`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return response.data
+}
+
+export async function deletePartyBProfileDocumentByUserId(userId, docId) {
+  const response = await client.delete(`/api/profile/party-b/${userId}/documents/${docId}`)
   return response.data
 }

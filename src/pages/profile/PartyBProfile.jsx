@@ -71,7 +71,8 @@ function applyProfileData(data, setForm, setCompletion, setAvailableSectors) {
   }
 }
 
-export default function PartyBProfile() {
+export default function PartyBProfile({ staffUserId = null }) {
+  const isStaffEdit = Boolean(staffUserId)
   const [form, setForm] = useState(EMPTY_FORM)
   const [availableSectors, setAvailableSectors] = useState([])
   const [completion, setCompletion] = useState(null)
@@ -92,7 +93,9 @@ export default function PartyBProfile() {
   const loadProfile = useCallback(async () => {
     setError('')
     try {
-      const data = await profileApi.getPartyBProfile()
+      const data = isStaffEdit
+        ? await profileApi.getPartyBProfileByUserId(staffUserId)
+        : await profileApi.getPartyBProfile()
       applyProfileData(data, setForm, setCompletion, setAvailableSectors)
 
       if (!data.available_sectors?.length) {
@@ -108,7 +111,7 @@ export default function PartyBProfile() {
     } catch (err) {
       setError(getErrorMessage(err))
     }
-  }, [])
+  }, [isStaffEdit, staffUserId])
 
   useEffect(() => {
     async function init() {
@@ -139,7 +142,9 @@ export default function PartyBProfile() {
     setError('')
     setSuccess('')
     try {
-      const data = await profileApi.updatePartyBProfile(formToPayload(form))
+      const data = isStaffEdit
+        ? await profileApi.updatePartyBProfileByUserId(staffUserId, formToPayload(form))
+        : await profileApi.updatePartyBProfile(formToPayload(form))
       applyProfileData(data, setForm, setCompletion, setAvailableSectors)
       setSuccess(data.message || 'Profile updated')
     } catch (err) {
@@ -155,7 +160,9 @@ export default function PartyBProfile() {
     setError('')
     setSuccess('')
     try {
-      const data = await profileApi.uploadPartyBProfileDocument({ file, docType })
+      const data = isStaffEdit
+        ? await profileApi.uploadPartyBProfileDocumentByUserId(staffUserId, { file, docType })
+        : await profileApi.uploadPartyBProfileDocument({ file, docType })
       applyProfileData(data, setForm, setCompletion, setAvailableSectors)
       const label =
         docType === 'business_license' ? 'Business License' : 'Registration Certificate'
@@ -174,12 +181,19 @@ export default function PartyBProfile() {
     setError('')
     setSuccess('')
     try {
-      const data = await profileApi.uploadPartyBProfileDocument({
-        file: otherForm.file,
-        docType: 'other',
-        title: otherForm.title.trim(),
-        description: otherForm.description.trim() || undefined,
-      })
+      const data = isStaffEdit
+        ? await profileApi.uploadPartyBProfileDocumentByUserId(staffUserId, {
+            file: otherForm.file,
+            docType: 'other',
+            title: otherForm.title.trim(),
+            description: otherForm.description.trim() || undefined,
+          })
+        : await profileApi.uploadPartyBProfileDocument({
+            file: otherForm.file,
+            docType: 'other',
+            title: otherForm.title.trim(),
+            description: otherForm.description.trim() || undefined,
+          })
       applyProfileData(data, setForm, setCompletion, setAvailableSectors)
       setOtherForm({ title: '', description: '', file: null })
       setSuccess('Document uploaded')
@@ -196,7 +210,9 @@ export default function PartyBProfile() {
     setError('')
     setSuccess('')
     try {
-      const data = await profileApi.deletePartyBProfileDocument(id)
+      const data = isStaffEdit
+        ? await profileApi.deletePartyBProfileDocumentByUserId(staffUserId, id)
+        : await profileApi.deletePartyBProfileDocument(id)
       applyProfileData(data, setForm, setCompletion, setAvailableSectors)
       setSuccess('Document deleted')
     } catch (err) {
@@ -225,15 +241,19 @@ export default function PartyBProfile() {
       <div>
         <h3 className="text-lg font-semibold text-slate-800">Company Profile</h3>
         <p className="text-sm text-slate-500">
-          Complete your company profile and upload mandatory certificates.
+          {isStaffEdit
+            ? 'Update company profile and mandatory certificates for this Party B account.'
+            : 'Complete your company profile and upload mandatory certificates.'}
         </p>
-        <p className="mt-1 text-xs text-slate-400">
-          Account settings (name, email) are in{' '}
-          <Link to="/profile" className="font-medium text-portal-primary hover:underline">
-            My Profile
-          </Link>
-          .
-        </p>
+        {!isStaffEdit && (
+          <p className="mt-1 text-xs text-slate-400">
+            Account settings (name, email) are in{' '}
+            <Link to="/profile" className="font-medium text-portal-primary hover:underline">
+              My Profile
+            </Link>
+            .
+          </p>
+        )}
       </div>
 
       <Alert type="error" message={error} onClose={() => setError('')} />
