@@ -141,11 +141,11 @@ export default function SectorLeadReassign() {
           )}
           {sector && !loadingLeads && sectorLeads.length === 0 && (
             <p className="mt-2 text-xs text-amber-700">
-              No active Sector Lead for this sector.{' '}
-              <Link to="/admin/users/new" className="font-semibold underline">
-                Add user
+              No sector lead assigned to this sector. Assign sectors in{' '}
+              <Link to="/admin/settings/sectors" className="font-semibold underline">
+                Settings → Sectors
               </Link>{' '}
-              with role Sector Lead and matching sector.
+              (Sector Lead Assignments), then run handoff.
             </p>
           )}
         </div>
@@ -179,6 +179,13 @@ export default function SectorLeadReassign() {
           <li>Open complaints → new sector officer</li>
           <li>Open China proposals → new sector officer</li>
           <li>Direct MOUS — no action needed (sector-based queue)</li>
+          <li>
+            New officer must already be assigned to the sector in{' '}
+            <Link to="/admin/settings/sectors" className="font-semibold underline">
+              Settings → Sectors
+            </Link>{' '}
+            before handoff.
+          </li>
         </ul>
       </div>
     </div>

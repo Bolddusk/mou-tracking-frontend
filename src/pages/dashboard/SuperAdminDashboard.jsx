@@ -432,6 +432,7 @@ export default function SuperAdminDashboard() {
           hideSectorFilter={listScope !== 'all'}
           onClearAll={clearAllFilters}
           hasActiveFilters={hasActiveFilters || Boolean(statusFilter)}
+          onReportError={setError}
         />
 
         {showConferenceTable ? (

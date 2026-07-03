@@ -3,6 +3,7 @@ import * as sectorsApi from '../../api/sectors'
 import Alert from '../../components/Alert'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import Modal from '../../components/Modal'
+import SectorLeadAssignmentsPanel from '../../components/admin/SectorLeadAssignmentsPanel'
 import { useSectors } from '../../context/SectorsContext'
 import { getErrorMessage } from '../../utils/format'
 
@@ -292,6 +293,8 @@ export default function SectorsAdmin() {
           </div>
         )}
       </Modal>
+
+      <SectorLeadAssignmentsPanel sectorNames={sectors.filter((s) => s.is_active !== false).map((s) => s.name)} />
     </div>
   )
 }

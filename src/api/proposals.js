@@ -164,8 +164,93 @@ export async function getProposalFilterOptions() {
   return response.data
 }
 
+export async function getConferenceReport(conferenceKey) {
+  const response = await client.get('/api/proposals/conference-report', {
+    params: { conference_key: conferenceKey },
+  })
+  return response.data
+}
+
+function filenameFromContentDisposition(header, fallback) {
+  if (!header) return fallback
+  const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (utf8Match) return decodeURIComponent(utf8Match[1].trim())
+  const quotedMatch = /filename="([^"]+)"/i.exec(header)
+  if (quotedMatch) return quotedMatch[1]
+  const plainMatch = /filename=([^;]+)/i.exec(header)
+  if (plainMatch) return plainMatch[1].trim().replace(/"/g, '')
+  return fallback
+}
+
+function triggerFileDownload(objectUrl, filename) {
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+}
+
+/**
+ * @param {'pdf'|'xlsx'} format
+ * @param {{ attachment?: boolean }} [options] — PDF default inline tab; xlsx always downloads
+ */
+export async function downloadConferenceReport(conferenceKey, format, { attachment = false } = {}) {
+  const params = { conference_key: conferenceKey, format }
+  if (attachment) params.download = 1
+
+  const response = await client.get('/api/proposals/conference-report', {
+    params,
+    responseType: 'blob',
+  })
+
+  const safeKey = String(conferenceKey).replace(/[^a-z0-9-]+/gi, '-')
+  const defaultName =
+    format === 'xlsx' ? `SIFC-report-${safeKey}.xlsx` : `SIFC-report-${safeKey}.pdf`
+  const defaultMime =
+    format === 'xlsx'
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'application/pdf'
+
+  const filename = filenameFromContentDisposition(
+    response.headers['content-disposition'],
+    defaultName,
+  )
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || defaultMime,
+  })
+  const objectUrl = URL.createObjectURL(blob)
+
+  if (format === 'pdf' && !attachment) {
+    const tab = window.open(objectUrl, '_blank', 'noopener,noreferrer')
+    if (!tab) triggerFileDownload(objectUrl, filename)
+  } else {
+    triggerFileDownload(objectUrl, filename)
+  }
+
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+}
+
+export async function downloadConferenceReportPdf(conferenceKey) {
+  return downloadConferenceReport(conferenceKey, 'pdf')
+}
+
+export async function downloadConferenceReportXlsx(conferenceKey) {
+  return downloadConferenceReport(conferenceKey, 'xlsx', { attachment: true })
+}
+
 export async function getProposalById(id) {
   const response = await client.get(`/api/proposals/${id}`)
+  return response.data
+}
+
+export async function getProposalEditableFields(id) {
+  const response = await client.get(`/api/proposals/${id}/editable-fields`)
+  return response.data
+}
+
+export async function patchProposalFields(id, body) {
+  const response = await client.patch(`/api/proposals/${id}/fields`, body)
   return response.data
 }
 

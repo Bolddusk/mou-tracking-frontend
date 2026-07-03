@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { PORTAL_SHORT } from '../../constants/branding'
 import { ROLE_LABELS } from '../../constants/sectors'
+import { formatScopedSectorsLabel, getScopedSectors } from '../../utils/scopedSectors'
 import {
   flattenNavigation,
   isMatchmakingNavPath,
@@ -233,7 +234,11 @@ export default function DashboardLayout({ title }) {
   const useRbacNav = navigation.length > 0
   const mobileNavItems = useMemo(() => flattenNavigation(navigation).slice(0, 8), [navigation])
 
-  const scopedSector = rbac?.context?.scoped_sector || rbac?.context?.sector || user?.sector
+  const scopedSectors = useMemo(
+    () => getScopedSectors({ rbac, user }),
+    [rbac, user],
+  )
+  const scopedSector = formatScopedSectorsLabel(scopedSectors) || rbac?.context?.scoped_sector || user?.sector
   const roleLabel = rbac?.role_label || ROLE_LABELS[user?.role] || user?.role
 
   const footerLabel = useMemo(() => {

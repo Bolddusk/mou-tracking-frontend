@@ -68,6 +68,7 @@ export const ROUTE_ACCESS = {
     NAV_PERMS.PROPOSALS_NEW_DIRECT,
     'proposals.view',
   ],
+  conferenceReport: [NAV_PERMS.OPPORTUNITIES_ALL, NAV_PERMS.USERS, 'admin.users', 'users.manage'],
   mmProposalDetail: [
     NAV_PERMS.MM_MY_PROPOSALS,
     NAV_PERMS.MM_REVIEW_QUEUE,

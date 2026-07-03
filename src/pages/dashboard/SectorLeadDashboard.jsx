@@ -34,6 +34,10 @@ import {
   getOpportunitiesDashboardHeader,
   normalizeMouLifecycleStatuses,
 } from '../../utils/mouConferenceFields'
+import {
+  formatScopedSectorsDetail,
+  getScopedSectors,
+} from '../../utils/scopedSectors'
 
 const DEFAULT_PAGE_LIMIT = 20
 
@@ -45,7 +49,7 @@ const EMPTY_ADVANCED_FILTERS = {
 
 export default function SectorLeadDashboard() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, rbac } = useAuth()
   const profilePaths = getPartyAProfilePaths(user?.role)
 
   const [statusFilter, setStatusFilter] = useState('')
@@ -87,8 +91,18 @@ export default function SectorLeadDashboard() {
       .catch(() => {
         if (!cancelled) {
           setFilterOptions({
-            sectors: user?.sector ? [user.sector] : [],
-            scoped_sector: user?.sector || null,
+            sectors: user?.assigned_sectors?.length
+              ? user.assigned_sectors
+              : user?.sector
+                ? [user.sector]
+                : [],
+            scoped_sector: user?.primary_sector || user?.sector || null,
+            scoped_sectors:
+              user?.assigned_sectors?.length
+                ? user.assigned_sectors
+                : user?.sector
+                  ? [user.sector]
+                  : [],
             proposal_statuses: [],
             mou_lifecycle_statuses: DEFAULT_MOU_LIFECYCLE_STATUSES,
             cooperation_modes: [],
@@ -99,14 +113,19 @@ export default function SectorLeadDashboard() {
     return () => {
       cancelled = true
     }
-  }, [user?.sector])
+  }, [user?.sector, user?.assigned_sectors, user?.primary_sector])
 
   const cooperationModeFilters = useMemo(
     () => buildCooperationModeFilters(filterOptions?.cooperation_modes),
     [filterOptions?.cooperation_modes],
   )
 
-  const scopedSector = filterOptions?.scoped_sector || user?.sector
+  const scopedSectors = useMemo(
+    () => getScopedSectors({ rbac, user, filterOptions }),
+    [rbac, user, filterOptions],
+  )
+
+  const scopedSectorLabel = formatScopedSectorsDetail(scopedSectors)
 
   const selectedConference = useMemo(
     () => (filterOptions?.conferences || []).find((c) => c.key === conferenceFilter) || null,
@@ -126,9 +145,9 @@ export default function SectorLeadDashboard() {
         selectedConference,
         listScope: 'sector',
         pageTitle: 'Sector Review Queue',
-        scopedSector,
+        scopedSector: scopedSectorLabel,
       }),
-    [selectedConference, scopedSector],
+    [selectedConference, scopedSectorLabel],
   )
 
   const showConferenceTable = conferenceShowsHistoricMouColumnsByKey(
@@ -160,20 +179,20 @@ export default function SectorLeadDashboard() {
 
   const loadStats = useCallback(async () => {
     try {
-      const result = await proposalsApi.getSectorLeadProposalsPaginated({ limit: 100, page: 1 })
+      const result = await proposalsApi.getOpportunitiesListPaginated({ limit: 100, page: 1 }, rbac)
       setStatsProposals(result.data)
       setStatsTotal(result.pagination?.total ?? result.data.length)
     } catch {
       setStatsProposals([])
       setStatsTotal(0)
     }
-  }, [])
+  }, [rbac])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const result = await proposalsApi.getSectorLeadProposalsPaginated(listParams)
+      const result = await proposalsApi.getOpportunitiesListPaginated(listParams, rbac)
       setProposals(result.data)
       setPagination(result.pagination)
     } catch (err) {
@@ -183,7 +202,7 @@ export default function SectorLeadDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [listParams])
+  }, [listParams, rbac])
 
   useEffect(() => {
     loadStats()
@@ -411,6 +430,7 @@ export default function SectorLeadDashboard() {
           hideSectorFilter
           onClearAll={clearAllFilters}
           hasActiveFilters={hasActiveFilters || Boolean(statusFilter)}
+          onReportError={setError}
         />
 
         {showConferenceTable ? (

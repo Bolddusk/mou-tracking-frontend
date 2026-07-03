@@ -23,6 +23,7 @@ import PartyBProfileView from './pages/profile/PartyBProfileView'
 import PartyBDashboard from './pages/dashboard/PartyBDashboard'
 import SectorLeadDashboard from './pages/dashboard/SectorLeadDashboard'
 import SuperAdminDashboard from './pages/dashboard/SuperAdminDashboard'
+import ConferenceReportPage from './pages/reports/ConferenceReportPage'
 import RegionalFocalDashboard from './pages/dashboard/RegionalFocalDashboard'
 import ProposalDetail from './pages/proposals/ProposalDetail'
 import ComplaintsList from './pages/complaints/ComplaintsList'
@@ -280,6 +281,17 @@ export default function App() {
             <Route path="/proposals/:id" element={<ProposalDetail />} />
             <Route path="/matchmaking/engagement/:id/mou" element={<MmEngagementMou />} />
             <Route path="/matchmaking/matches/:id/mou" element={<MmEngagementMou />} />
+          </Route>
+
+          <Route
+            element={
+              <PermissionShell
+                title="Conference Report"
+                permissions={ROUTE_ACCESS.conferenceReport}
+              />
+            }
+          >
+            <Route path="/reports/conference/:conferenceKey" element={<ConferenceReportPage />} />
           </Route>
 
           <Route element={<PermissionShell title="Complaints" permissions={ROUTE_ACCESS.complaints} />}>

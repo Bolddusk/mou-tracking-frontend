@@ -11,7 +11,7 @@ import {
 import { resolveFileUrl } from '../utils/format'
 import { formatDate } from '../utils/format'
 
-export default function ProposalDetailPanel({ proposal, onOpenFile, conferences = [] }) {
+export default function ProposalDetailPanel({ proposal, onOpenFile, conferences = [], onEditFields }) {
   if (!proposal) return null
 
   const open = (url, title) => onOpenFile?.(url, title)
@@ -41,7 +41,11 @@ export default function ProposalDetailPanel({ proposal, onOpenFile, conferences 
         </div>
       )}
 
-      <MouConferenceDetailsSection proposal={proposal} conferences={conferences} />
+      <MouConferenceDetailsSection
+        proposal={proposal}
+        conferences={conferences}
+        onEdit={onEditFields}
+      />
 
       <Section title="Engagement & Conference">
         <GridFields

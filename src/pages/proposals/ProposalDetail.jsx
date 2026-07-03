@@ -17,6 +17,7 @@ import Modal from '../../components/Modal'
 import PartyBCredentialsModal from '../../components/PartyBCredentialsModal'
 import ProposalChatPanel from '../../components/proposal/ProposalChatPanel'
 import ProposalMouPartyCards from '../../components/proposal/ProposalMouPartyCards'
+import ProposalMouFieldsEditor from '../../components/proposal/ProposalMouFieldsEditor'
 import ProposalPartyContactsEditor from '../../components/proposal/ProposalPartyContactsEditor'
 import ProposalExportMenu from '../../components/proposal/ProposalExportMenu'
 import ProposalExportReportModal from '../../components/proposal/ProposalExportReportModal'
@@ -28,7 +29,7 @@ import StatusBadge from '../../components/StatusBadge'
 import { useAuth } from '../../context/AuthContext'
 import { getEngagementLabel, getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { isMatchMouReady } from '../../constants/matchmaking'
-import { ROLE_LABELS } from '../../constants/sectors'
+import { ROLE_LABELS, ROLES } from '../../constants/sectors'
 import { formatDate, getErrorMessage, resolveFileUrl } from '../../utils/format'
 import { formatUpdateRequestLabel } from '../../utils/proposalDisplay'
 import { loadDraftFromProposal } from '../../utils/proposalDraft'
@@ -107,6 +108,7 @@ export default function ProposalDetail() {
   const [mmMatch, setMmMatch] = useState(null)
   const [mouStatus, setMouStatus] = useState(null)
   const [contactsEditorOpen, setContactsEditorOpen] = useState(false)
+  const [fieldsEditorOpen, setFieldsEditorOpen] = useState(false)
   const [credentialModal, setCredentialModal] = useState(null)
   const credentialQueueRef = useRef([])
 
@@ -202,7 +204,22 @@ export default function ProposalDetail() {
   const canMarkSigned = (isSectorLead || isSuperAdmin) && !isDealClosed
 
   const canEditPartyContacts = Boolean(proposal?.capabilities?.can_edit_party_contacts)
+  const canEditFields = Boolean(proposal?.capabilities?.can_edit_fields)
   const canManagePartyContacts = canEditPartyContacts || isSuperAdmin
+  const isAdminRole = isSuperAdmin || user?.role === ROLES.ADMIN
+
+  const openFieldsEditor = () => setFieldsEditorOpen(true)
+
+  const handleFieldsSaved = (res) => {
+    if (res?.proposal) {
+      setProposal((prev) => ({
+        ...prev,
+        ...res.proposal,
+        capabilities: res.capabilities || prev?.capabilities,
+      }))
+    }
+    setSuccess(res?.message || 'Proposal fields updated successfully')
+  }
 
   const enqueueCredentialPrompts = (prompts) => {
     if (!prompts.length) return
@@ -583,6 +600,15 @@ export default function ProposalDetail() {
           ← {backLabel}
         </Link>
         <div className="flex flex-wrap gap-2">
+          {canEditFields && (
+            <button
+              type="button"
+              onClick={openFieldsEditor}
+              className="inline-flex items-center gap-2 rounded-lg border border-green-700/30 bg-green-50 px-4 py-2 text-sm font-semibold text-green-900 shadow-sm hover:bg-green-100"
+            >
+              Edit MOU fields
+            </button>
+          )}
           {canExportReport && canWriteActivities && (
             <>
               <ProposalExportMenu proposalId={proposal?.id} onError={setError} />
@@ -932,6 +958,7 @@ export default function ProposalDetail() {
           <ProposalDetailPanel
             proposal={proposal}
             conferences={conferences}
+            onEditFields={canEditFields ? openFieldsEditor : undefined}
             onOpenFile={(url, title) => setFilePreview({ url, title })}
           />
         </>
@@ -1051,6 +1078,15 @@ export default function ProposalDetail() {
         proposal={proposal}
         onClose={() => setContactsEditorOpen(false)}
         onSaved={handlePartyContactsSaved}
+      />
+
+      <ProposalMouFieldsEditor
+        open={fieldsEditorOpen}
+        proposalId={Number(id)}
+        proposal={proposal}
+        isAdmin={isAdminRole}
+        onClose={() => setFieldsEditorOpen(false)}
+        onSaved={handleFieldsSaved}
       />
 
       <PartyBCredentialsModal

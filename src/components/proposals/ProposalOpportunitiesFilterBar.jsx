@@ -1,4 +1,5 @@
 import ProposalStatusFilters from './ProposalStatusFilters'
+import ConferenceReportActions from '../reports/ConferenceReportActions'
 
 function FilterSelect({ label, value, onChange, children, className = '' }) {
   return (
@@ -54,6 +55,7 @@ export default function ProposalOpportunitiesFilterBar({
   onClearAll,
   hasActiveFilters = false,
   hideSectorFilter = false,
+  onReportError,
 }) {
   return (
     <div className="border-b border-slate-100 bg-green-50/40 px-4 py-4 sm:px-6">
@@ -73,6 +75,13 @@ export default function ProposalOpportunitiesFilterBar({
               </option>
             ))}
           </FilterSelect>
+          {selectedConference?.supports_report && (
+            <ConferenceReportActions
+              conferenceKey={selectedConference.key}
+              conferenceName={selectedConference.name}
+              onError={onReportError}
+            />
+          )}
           {selectedConference && (
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
               {selectedConference.mou_count != null && (
