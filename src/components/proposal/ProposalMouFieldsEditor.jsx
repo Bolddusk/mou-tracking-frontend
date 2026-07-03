@@ -93,6 +93,16 @@ export default function ProposalMouFieldsEditor({
   }, [open, proposalId])
 
   const sectors = useMemo(() => catalog?.sectors || [], [catalog?.sectors])
+  const conferences = useMemo(() => catalog?.conferences || [], [catalog?.conferences])
+  const sifcCategories = useMemo(() => catalog?.sifc_categories || [], [catalog?.sifc_categories])
+
+  const selectedConference = useMemo(
+    () =>
+      conferences.find(
+        (c) => (c.key || c.conference_key) === form.conference_key
+      ),
+    [conferences, form.conference_key]
+  )
 
   const cooperationModes = catalog?.catalog?.enums?.cooperation_mode || ['mou', 'jv', 'agreement']
   const operationalStatuses = catalog?.catalog?.enums?.mou_operational_status || [
@@ -109,11 +119,6 @@ export default function ProposalMouFieldsEditor({
     setForm((prev) => ({
       ...prev,
       executive_summary: { ...prev.executive_summary, [key]: value },
-    }))
-  const setPartyAOrg = (value) =>
-    setForm((prev) => ({
-      ...prev,
-      party_a_info: { ...prev.party_a_info, organization_name: value },
     }))
 
   const handleSave = async () => {
@@ -186,7 +191,7 @@ export default function ProposalMouFieldsEditor({
                 onChange={(e) => setScalar('cooperation_mode', e.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
               >
-                <option value="">—</option>
+                <option value="">Select Mode</option>
                 {cooperationModes.map((mode) => (
                   <option key={mode} value={mode}>
                     {COOPERATION_MODE_LABELS[mode] || mode}
@@ -214,38 +219,63 @@ export default function ProposalMouFieldsEditor({
             <TextInput value={form.company_name} onChange={(v) => setScalar('company_name', v)} />
           </label>
           <label className="block">
-            <FieldLabel>Party A organization</FieldLabel>
-            <TextInput value={form.party_a_info.organization_name} onChange={setPartyAOrg} />
-          </label>
-          <label className="block">
             <FieldLabel>Chinese company</FieldLabel>
             <TextInput value={form.party_b_name} onChange={(v) => setScalar('party_b_name', v)} />
           </label>
         </Section>
 
         <Section title="Conference">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <FieldLabel>Conference key</FieldLabel>
-              <TextInput value={form.conference_key} onChange={(v) => setScalar('conference_key', v)} />
-            </label>
-            <label className="block">
-              <FieldLabel>Conference name</FieldLabel>
-              <TextInput
-                value={form.conference_name}
-                onChange={(v) => setScalar('conference_name', v)}
-              />
-            </label>
-          </div>
+          <label className="block">
+            <FieldLabel>Conference</FieldLabel>
+            <select
+              value={form.conference_key}
+              onChange={(e) => setScalar('conference_key', e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
+            >
+              <option value="">Select conference…</option>
+              {form.conference_key && !selectedConference && (
+                <option value={form.conference_key}>
+                  {proposal?.conference_name || form.conference_key} (current)
+                </option>
+              )}
+              {conferences.map((c) => {
+                const key = c.key || c.conference_key
+                return (
+                  <option key={key || c.id} value={key}>
+                    {c.name}
+                  </option>
+                )
+              })}
+            </select>
+            {selectedConference && (
+              <p className="mt-1 text-xs text-slate-500">
+                Key: {selectedConference.key || selectedConference.conference_key}
+              </p>
+            )}
+          </label>
         </Section>
 
         <Section title="MOU details (historic / executive summary)">
           <label className="block">
             <FieldLabel>SIFC category</FieldLabel>
-            <TextInput
+            <select
               value={form.executive_summary.sifc_category}
-              onChange={(v) => setEs('sifc_category', v)}
-            />
+              onChange={(e) => setEs('sifc_category', e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
+            >
+              <option value="">Select category…</option>
+              {form.executive_summary.sifc_category &&
+                !sifcCategories.some((c) => c.name === form.executive_summary.sifc_category) && (
+                  <option value={form.executive_summary.sifc_category}>
+                    {form.executive_summary.sifc_category} (current)
+                  </option>
+                )}
+              {sifcCategories.map((cat) => (
+                <option key={cat.id || cat.name} value={cat.name}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="block">
             <FieldLabel>Operational status</FieldLabel>
@@ -318,22 +348,6 @@ export default function ProposalMouFieldsEditor({
           </label>
         </Section>
 
-        {isAdmin && (
-          <Section title="Admin only">
-            <label className="block">
-              <FieldLabel>External reference</FieldLabel>
-              <TextInput
-                value={form.external_reference}
-                onChange={(v) => setScalar('external_reference', v)}
-              />
-            </label>
-          </Section>
-        )}
-
-        <p className="text-xs text-slate-500">
-          Workflow status (draft/submitted/approved) is not changed here — use approve/reject actions.
-          Only modified fields are sent to the server.
-        </p>
       </div>
     </Modal>
   )

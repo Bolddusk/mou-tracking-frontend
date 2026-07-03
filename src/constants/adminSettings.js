@@ -16,6 +16,20 @@ export const ADMIN_SETTINGS_TABS = [
     permissions: ['nav.sectors.manage', 'admin.sectors'],
   },
   {
+    id: 'conferences',
+    label: 'Conferences',
+    path: '/admin/settings/conferences',
+    permission: 'nav.sectors.manage',
+    permissions: ['nav.sectors.manage', 'admin.sectors'],
+  },
+  {
+    id: 'sifc-categories',
+    label: 'SIFC Categories',
+    path: '/admin/settings/sifc-categories',
+    permission: 'nav.sectors.manage',
+    permissions: ['nav.sectors.manage', 'admin.sectors'],
+  },
+  {
     id: 'permissions',
     label: 'Permissions',
     path: '/admin/settings/permissions',
@@ -46,3 +60,7 @@ export const ADMIN_SETTINGS_SIDEBAR = {
 }
 
 export const ADMIN_SETTINGS_ROUTE_ACCESS = ADMIN_SETTINGS_TABS.flatMap((tab) => tab.permissions)
+
+export function getAdminSettingsTab(id) {
+  return ADMIN_SETTINGS_TABS.find((tab) => tab.id === id)
+}

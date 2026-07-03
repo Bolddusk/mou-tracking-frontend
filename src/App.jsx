@@ -9,7 +9,7 @@ import AdminSettingsLayout, {
   AdminSettingsDefaultRedirect,
   AdminSettingsTab,
 } from './pages/admin/AdminSettingsLayout'
-import { ADMIN_SETTINGS_TABS } from './constants/adminSettings'
+import { getAdminSettingsTab } from './constants/adminSettings'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import ChangePassword from './pages/auth/ChangePassword'
@@ -34,6 +34,8 @@ import NewUser from './pages/admin/NewUser'
 import UserDetail from './pages/admin/UserDetail'
 import PermissionsAdmin from './pages/admin/PermissionsAdmin'
 import SectorsAdmin from './pages/admin/SectorsAdmin'
+import ConferencesAdmin from './pages/admin/ConferencesAdmin'
+import SifcCategoriesAdmin from './pages/admin/SifcCategoriesAdmin'
 import SectorLeadReassign from './pages/admin/SectorLeadReassign'
 import SectorLeadHandoff from './pages/admin/SectorLeadHandoff'
 import ComplianceFilingsOverview from './pages/admin/ComplianceFilingsOverview'
@@ -324,7 +326,7 @@ export default function App() {
               <Route
                 path="users"
                 element={
-                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[0].permissions}>
+                  <AdminSettingsTab permissions={getAdminSettingsTab('users').permissions}>
                     <UsersList />
                   </AdminSettingsTab>
                 }
@@ -332,15 +334,31 @@ export default function App() {
               <Route
                 path="sectors"
                 element={
-                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[1].permissions}>
+                  <AdminSettingsTab permissions={getAdminSettingsTab('sectors').permissions}>
                     <SectorsAdmin />
+                  </AdminSettingsTab>
+                }
+              />
+              <Route
+                path="conferences"
+                element={
+                  <AdminSettingsTab permissions={getAdminSettingsTab('conferences').permissions}>
+                    <ConferencesAdmin />
+                  </AdminSettingsTab>
+                }
+              />
+              <Route
+                path="sifc-categories"
+                element={
+                  <AdminSettingsTab permissions={getAdminSettingsTab('sifc-categories').permissions}>
+                    <SifcCategoriesAdmin />
                   </AdminSettingsTab>
                 }
               />
               <Route
                 path="permissions"
                 element={
-                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[2].permissions}>
+                  <AdminSettingsTab permissions={getAdminSettingsTab('permissions').permissions}>
                     <PermissionsAdmin />
                   </AdminSettingsTab>
                 }
@@ -348,7 +366,7 @@ export default function App() {
               <Route
                 path="sector-officer"
                 element={
-                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[3].permissions}>
+                  <AdminSettingsTab permissions={getAdminSettingsTab('sector-officer').permissions}>
                     <SectorLeadHandoff />
                   </AdminSettingsTab>
                 }
@@ -356,7 +374,7 @@ export default function App() {
               <Route
                 path="sector-officer/reassign"
                 element={
-                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[3].permissions}>
+                  <AdminSettingsTab permissions={getAdminSettingsTab('sector-officer').permissions}>
                     <SectorLeadReassign />
                   </AdminSettingsTab>
                 }
@@ -364,7 +382,7 @@ export default function App() {
               <Route
                 path="compliance"
                 element={
-                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[4].permissions}>
+                  <AdminSettingsTab permissions={getAdminSettingsTab('compliance').permissions}>
                     <ComplianceFilingsOverview />
                   </AdminSettingsTab>
                 }
@@ -372,7 +390,7 @@ export default function App() {
               <Route
                 path="compliance/:userId"
                 element={
-                  <AdminSettingsTab permissions={ADMIN_SETTINGS_TABS[4].permissions}>
+                  <AdminSettingsTab permissions={getAdminSettingsTab('compliance').permissions}>
                     <ComplianceFilingDetail />
                   </AdminSettingsTab>
                 }

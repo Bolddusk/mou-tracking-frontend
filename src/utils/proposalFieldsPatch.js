@@ -20,7 +20,6 @@ const SCALAR_FORM_KEYS = [
   'mou_sub_sector',
   'proposal_description',
   'conference_key',
-  'conference_name',
   'external_reference',
 ]
 
@@ -41,13 +40,8 @@ export function proposalFieldsFormFromProposal(proposal) {
     mou_sub_sector: proposal?.mou_sub_sector || proposal?.mou_scope || '',
     proposal_description: proposal?.proposal_description || '',
     conference_key: proposal?.conference_key || '',
-    conference_name: proposal?.conference_name || '',
     external_reference: proposal?.external_reference || '',
     executive_summary,
-    party_a_info: {
-      organization_name:
-        proposal?.party_a_info?.organization_name || proposal?.company_name || '',
-    },
   }
 }
 
@@ -78,12 +72,6 @@ export function buildProposalFieldsPatch(baseline, current, { isAdmin = false } 
   }
   if (Object.keys(esPatch).length) {
     patch.executive_summary = esPatch
-  }
-
-  const orgBefore = normalizeScalar(baseline.party_a_info?.organization_name)
-  const orgAfter = normalizeScalar(current.party_a_info?.organization_name)
-  if (orgBefore !== orgAfter) {
-    patch.party_a_info = { organization_name: orgAfter }
   }
 
   return patch
