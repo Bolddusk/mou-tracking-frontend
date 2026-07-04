@@ -6,6 +6,7 @@ import StatusBadge from '../StatusBadge'
 import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { COOPERATION_MODE_LABELS } from '../../constants/proposalFilters'
 import { formatDate } from '../../utils/format'
+import { formatProposalConferenceDate } from '../../utils/mouConferenceFields'
 import { getPartyADisplay, getPartyBDisplay } from '../../utils/proposalDisplay'
 
 export default function ProposalOpportunitiesTable({
@@ -21,6 +22,8 @@ export default function ProposalOpportunitiesTable({
   showCooperationMode = false,
   showMouLifecycle = false,
   showDocumentLinks = true,
+  showWorkflowStatus = true,
+  useConferenceDate = false,
 }) {
   if (loading) {
     return (
@@ -55,9 +58,13 @@ export default function ProposalOpportunitiesTable({
             {showMouLifecycle && (
               <th className="px-4 py-3 font-semibold">MOU Status</th>
             )}
-            <th className="px-4 py-3 font-semibold">Status</th>
+            {showWorkflowStatus && (
+              <th className="px-4 py-3 font-semibold">Status</th>
+            )}
             <th className="px-4 py-3 font-semibold">Request for Update</th>
-            <th className="px-4 py-3 font-semibold">Date</th>
+            <th className="px-4 py-3 font-semibold">
+              {useConferenceDate ? 'Conference Dates' : 'Date'}
+            </th>
             <th className="px-4 py-3 font-semibold">Actions</th>
           </tr>
         </thead>
@@ -115,12 +122,14 @@ export default function ProposalOpportunitiesTable({
                     />
                   </td>
                 )}
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <StatusBadge status={p.status} />
-                    {renderStatusExtra?.(p)}
-                  </div>
-                </td>
+                {showWorkflowStatus && (
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <StatusBadge status={p.status} />
+                      {renderStatusExtra?.(p)}
+                    </div>
+                  </td>
+                )}
                 <td className="px-4 py-3">
                   <div className="flex flex-col gap-1">
                     <PokeStatusBadge pokeStatus={p.poke_status} />
@@ -128,7 +137,9 @@ export default function ProposalOpportunitiesTable({
                   </div>
                 </td>
                 <td className="px-4 py-3 text-slate-600">
-                  {formatDate(p.submitted_at || p.created_at)}
+                  {useConferenceDate
+                    ? formatProposalConferenceDate(p)
+                    : formatDate(p.submitted_at || p.created_at)}
                 </td>
                 <td className="px-4 py-3">{renderActions?.(p)}</td>
               </tr>

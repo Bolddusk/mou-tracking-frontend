@@ -449,15 +449,10 @@ export default function SectorLeadDashboard() {
             showCooperationMode
             showMouLifecycle
             showDocumentLinks={false}
+            showWorkflowStatus={false}
+            useConferenceDate
             onView={handleView}
             onOpenFile={openFile}
-            renderStatusExtra={(p) =>
-              p.status === 'resubmitted' && (p.resubmit_count ?? 0) > 1 ? (
-                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
-                  ×{p.resubmit_count}
-                </span>
-              ) : null
-            }
             renderActions={renderTableActions}
           />
         )}

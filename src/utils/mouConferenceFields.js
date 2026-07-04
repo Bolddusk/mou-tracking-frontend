@@ -1,4 +1,5 @@
 import { COOPERATION_MODE_LABELS } from '../constants/proposalFilters'
+import { formatDateOnlyRange } from './format'
 
 export function findConferenceByKey(conferences, conferenceKey) {
   if (!conferenceKey || !Array.isArray(conferences)) return null
@@ -67,6 +68,22 @@ export function getChineseCompany(proposal) {
 export function getPakistaniCompany(proposal) {
   return displayOrDash(
     proposal?.company_name || proposal?.party_a_info?.organization_name || proposal?.party_a_name,
+  )
+}
+
+/** Conference start date from synced conference_info (updates when admin edits conference in Settings). */
+export function getProposalConferenceDate(proposal) {
+  return proposal?.conference_info?.conference_date || proposal?.conference_date || null
+}
+
+export function getProposalConferenceEndDate(proposal) {
+  return proposal?.conference_info?.conference_end_date || proposal?.conference_end_date || null
+}
+
+export function formatProposalConferenceDate(proposal) {
+  return formatDateOnlyRange(
+    getProposalConferenceDate(proposal),
+    getProposalConferenceEndDate(proposal)
   )
 }
 

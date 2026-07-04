@@ -1,7 +1,6 @@
 import LoadingSpinner from '../LoadingSpinner'
 import OperationalStatusBadge from './OperationalStatusBadge'
-import { formatDate } from '../../utils/format'
-import { getMouConferenceRow } from '../../utils/mouConferenceFields'
+import { formatProposalConferenceDate, getMouConferenceRow } from '../../utils/mouConferenceFields'
 
 export default function ProposalConferenceMouTable({
   proposals,
@@ -33,7 +32,7 @@ export default function ProposalConferenceMouTable({
             <th className="px-3 py-3 font-semibold">Mode</th>
             <th className="px-3 py-3 font-semibold">MoU Value</th>
             <th className="px-3 py-3 font-semibold">Status</th>
-            <th className="px-3 py-3 font-semibold">Date</th>
+            <th className="px-3 py-3 font-semibold">Conference Dates</th>
             <th className="px-3 py-3 font-semibold">Actions</th>
           </tr>
         </thead>
@@ -61,7 +60,7 @@ export default function ProposalConferenceMouTable({
                   <OperationalStatusBadge status={row.operationalStatus} />
                 </td>
                 <td className="whitespace-nowrap px-3 py-3 text-slate-600">
-                  {formatDate(p.submitted_at || p.created_at)}
+                  {formatProposalConferenceDate(p)}
                 </td>
                 <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                   {renderActions?.(p)}

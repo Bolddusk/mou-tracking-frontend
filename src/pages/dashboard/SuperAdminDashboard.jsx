@@ -451,6 +451,8 @@ export default function SuperAdminDashboard() {
             showCooperationMode
             showMouLifecycle
             showDocumentLinks={false}
+            showWorkflowStatus={false}
+            useConferenceDate
             onView={handleView}
             onOpenFile={openFile}
             renderActions={renderTableActions}

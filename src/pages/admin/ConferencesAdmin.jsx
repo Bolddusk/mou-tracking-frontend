@@ -3,7 +3,7 @@ import * as conferencesApi from '../../api/conferences'
 import Alert from '../../components/Alert'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import Modal from '../../components/Modal'
-import { getErrorMessage } from '../../utils/format'
+import { getErrorMessage, toDateInputValue } from '../../utils/format'
 
 const DEFAULT_ENGAGEMENT_TYPES = ['B2B', 'B2G', 'G2B', 'G2G']
 
@@ -68,8 +68,8 @@ export default function ConferencesAdmin() {
       name: row.name || '',
       engagement_type: row.engagement_type ? String(row.engagement_type).toUpperCase() : '',
       description: row.description || '',
-      conference_date: row.conference_date?.slice(0, 10) || '',
-      conference_end_date: row.conference_end_date?.slice(0, 10) || '',
+      conference_date: toDateInputValue(row.conference_date),
+      conference_end_date: toDateInputValue(row.conference_end_date),
       location: row.location || '',
       host: row.host || '',
       report_title: row.report_title || '',
