@@ -46,6 +46,9 @@ export default function ProposalOpportunitiesFilterBar({
   cooperationMode,
   onCooperationModeChange,
   cooperationModeFilters = [],
+  sifcCategory,
+  onSifcCategoryChange,
+  sifcCategories = [],
   dateFrom,
   onDateFromChange,
   dateTo,
@@ -137,6 +140,17 @@ export default function ProposalOpportunitiesFilterBar({
             </option>
           ))}
         </FilterSelect>
+
+        {sifcCategories.length > 0 && (
+          <FilterSelect label="SIFC Category" value={sifcCategory} onChange={onSifcCategoryChange}>
+            <option value="">All categories</option>
+            {sifcCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </FilterSelect>
+        )}
 
         <FilterDate label="From date" value={dateFrom} onChange={onDateFromChange} />
         <FilterDate label="To date" value={dateTo} onChange={onDateToChange} />

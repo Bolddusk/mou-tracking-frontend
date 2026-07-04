@@ -28,6 +28,7 @@ import PokeStatusBadge from '../../components/PokeStatusBadge'
 import StatusBadge from '../../components/StatusBadge'
 import { useAuth } from '../../context/AuthContext'
 import { getEngagementLabel, getProposalDisplayTitle } from '../../constants/proposalTemplate'
+import { getPakistaniCompanyDisplay } from '../../utils/proposalDisplay'
 import { isMatchMouReady } from '../../constants/matchmaking'
 import { ROLE_LABELS, ROLES } from '../../constants/sectors'
 import { formatDate, getErrorMessage, resolveFileUrl } from '../../utils/format'
@@ -767,14 +768,8 @@ export default function ProposalDetail() {
         </div>
         <div className="grid gap-px bg-white/10 sm:grid-cols-3">
           <HeroStat
-            label="Party A"
-            value={
-              proposal.party_a_info?.contact_name
-                ? [proposal.party_a_info.contact_name, proposal.party_a_info.organization_name]
-                    .filter(Boolean)
-                    .join(' · ')
-                : proposal.party_a_name || '—'
-            }
+            label="Pakistani Company"
+            value={getPakistaniCompanyDisplay(proposal)}
           />
           <HeroStat
             label="Submitted"

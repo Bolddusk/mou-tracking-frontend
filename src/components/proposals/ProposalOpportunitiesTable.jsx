@@ -6,8 +6,8 @@ import StatusBadge from '../StatusBadge'
 import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { COOPERATION_MODE_LABELS } from '../../constants/proposalFilters'
 import { formatDate } from '../../utils/format'
-import { formatProposalConferenceDate } from '../../utils/mouConferenceFields'
-import { getPartyADisplay, getPartyBDisplay } from '../../utils/proposalDisplay'
+import { formatProposalConferenceDate, getProposalSifcCategory } from '../../utils/mouConferenceFields'
+import { getChineseCompanyDisplay, getPakistaniCompanyDisplay } from '../../utils/proposalDisplay'
 
 export default function ProposalOpportunitiesTable({
   proposals,
@@ -24,6 +24,8 @@ export default function ProposalOpportunitiesTable({
   showDocumentLinks = true,
   showWorkflowStatus = true,
   useConferenceDate = false,
+  showTitle = false,
+  showSifcCategory = false,
 }) {
   if (loading) {
     return (
@@ -42,10 +44,13 @@ export default function ProposalOpportunitiesTable({
       <table className="min-w-[1100px] w-full text-left text-sm">
         <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
-            <th className="px-4 py-3 font-semibold">Title</th>
-            <th className="px-4 py-3 font-semibold">Party A</th>
-            <th className="px-4 py-3 font-semibold">Party B</th>
+            {showTitle && <th className="px-4 py-3 font-semibold">Title</th>}
+            <th className="px-4 py-3 font-semibold">Pakistani Company</th>
+            <th className="px-4 py-3 font-semibold">Chinese Company</th>
             <th className="px-4 py-3 font-semibold">Sector</th>
+            {showSifcCategory && (
+              <th className="px-4 py-3 font-semibold">SIFC Category</th>
+            )}
             {showCooperationMode && (
               <th className="px-4 py-3 font-semibold">Mode</th>
             )}
@@ -74,16 +79,32 @@ export default function ProposalOpportunitiesTable({
             const extraRowClass = rowClassName?.(p) || ''
             return (
               <tr key={p.id} className={`hover:bg-slate-50/80 ${extraRowClass}`}>
-                <td className="max-w-[160px] truncate px-4 py-3 font-medium text-slate-800">
-                  {title}
+                {showTitle && (
+                  <td className="max-w-[160px] truncate px-4 py-3 font-medium text-slate-800">
+                    {title}
+                  </td>
+                )}
+                <td
+                  className="max-w-[140px] truncate px-4 py-3 text-slate-600"
+                  title={getPakistaniCompanyDisplay(p)}
+                >
+                  {getPakistaniCompanyDisplay(p)}
                 </td>
-                <td className="max-w-[140px] truncate px-4 py-3 text-slate-600" title={getPartyADisplay(p)}>
-                  {getPartyADisplay(p)}
-                </td>
-                <td className="max-w-[140px] truncate px-4 py-3 text-slate-600" title={getPartyBDisplay(p)}>
-                  {getPartyBDisplay(p)}
+                <td
+                  className="max-w-[140px] truncate px-4 py-3 text-slate-600"
+                  title={getChineseCompanyDisplay(p)}
+                >
+                  {getChineseCompanyDisplay(p)}
                 </td>
                 <td className="px-4 py-3 text-slate-600">{p.sector || '—'}</td>
+                {showSifcCategory && (
+                  <td
+                    className="max-w-[160px] truncate px-4 py-3 text-slate-600"
+                    title={getProposalSifcCategory(p)}
+                  >
+                    {getProposalSifcCategory(p)}
+                  </td>
+                )}
                 {showCooperationMode && (
                   <td className="px-4 py-3">
                     {p.cooperation_mode ? (

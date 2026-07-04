@@ -1,4 +1,5 @@
 import { useAuth } from '../../context/AuthContext'
+import { getChineseCompanyDisplay, getPakistaniCompanyDisplay } from '../../utils/proposalDisplay'
 import { getPartyAProfilePaths, getPartyBProfilePaths } from '../../constants/profileRoutes'
 import PartyProfileSnapshotCard, {
   PARTY_A_MANDATORY,
@@ -19,8 +20,12 @@ export default function ProposalMouPartyCards({ proposal, onEditContacts, canEdi
 
   const partyAFallback = [
     {
+      label: 'Company',
+      value: getPakistaniCompanyDisplay(proposal),
+    },
+    {
       label: 'Contact',
-      value: proposal?.party_a_info?.contact_name || proposal?.party_a_name,
+      value: proposal?.party_a_info?.contact_name,
     },
     {
       label: 'Organization',
@@ -31,6 +36,7 @@ export default function ProposalMouPartyCards({ proposal, onEditContacts, canEdi
   ].filter((r) => r.value)
 
   const partyBFallback = [
+    { label: 'Company', value: getChineseCompanyDisplay(proposal) },
     { label: 'Contact', value: proposal?.party_b_name },
     { label: 'Organization', value: proposal?.party_b_organization },
     { label: 'Email', value: proposal?.party_b_email },
@@ -52,7 +58,7 @@ export default function ProposalMouPartyCards({ proposal, onEditContacts, canEdi
   return (
     <section className="grid gap-4 lg:grid-cols-2">
       <PartyProfileSnapshotCard
-        title="Party A"
+        title="Pakistani Company"
         snapshot={proposal?.party_a_profile}
         fallbackContacts={partyAFallback}
         mandatoryDocTypes={PARTY_A_MANDATORY}
@@ -64,7 +70,7 @@ export default function ProposalMouPartyCards({ proposal, onEditContacts, canEdi
         editContactsAction={editButton}
       />
       <PartyProfileSnapshotCard
-        title="Party B"
+        title="Chinese Company"
         snapshot={proposal?.party_b_profile}
         fallbackContacts={partyBFallback}
         mandatoryDocTypes={PARTY_B_MANDATORY}

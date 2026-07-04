@@ -237,6 +237,7 @@ export default function PartyADashboard() {
             proposals={filteredProposals}
             loading={loading}
             emptyMessage={filterEmptyMessage}
+            showTitle
             onView={(id) => navigate(`/proposals/${id}`)}
             onOpenFile={openFile}
             rowClassName={(p) =>

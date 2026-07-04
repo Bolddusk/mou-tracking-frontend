@@ -1,5 +1,5 @@
 import { getProposalDisplayTitle } from './proposalTemplate'
-import { getPartyADisplay, getPartyBDisplay } from '../utils/proposalDisplay'
+import { getChineseCompanyDisplay, getPakistaniCompanyDisplay } from '../utils/proposalDisplay'
 
 /** Status filter presets per dashboard role. `key: ''` = All (no API param). */
 export const PROPOSAL_STATUS_FILTERS = {
@@ -37,12 +37,13 @@ export function getProposalSearchText(proposal) {
   const parts = [
     getProposalDisplayTitle(proposal),
     proposal.venture_name,
+    proposal.pakistani_company,
+    proposal.chinese_company,
     proposal.company_name,
     proposal.proposal_title,
     proposal.display_title,
-    getPartyADisplay(proposal),
-    getPartyBDisplay(proposal),
-    proposal.party_a_name,
+    getPakistaniCompanyDisplay(proposal),
+    getChineseCompanyDisplay(proposal),
     proposal.party_a_organization,
     proposal.party_a_email,
     proposal.party_b_name,
@@ -112,6 +113,7 @@ export function buildProposalListParams({
   mou_lifecycle = '',
   cooperation_mode = '',
   conference_key = '',
+  sifc_category = '',
   q = '',
   date_from = '',
   date_to = '',
@@ -124,6 +126,7 @@ export function buildProposalListParams({
   if (mou_lifecycle) params.mou_lifecycle = mou_lifecycle
   if (cooperation_mode) params.cooperation_mode = cooperation_mode
   if (conference_key) params.conference_key = conference_key
+  if (sifc_category) params.sifc_category = sifc_category
   const trimmedQ = q?.trim()
   if (trimmedQ) params.q = trimmedQ
   if (date_from) params.date_from = date_from

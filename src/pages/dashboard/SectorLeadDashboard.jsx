@@ -43,6 +43,7 @@ const DEFAULT_PAGE_LIMIT = 20
 
 const EMPTY_ADVANCED_FILTERS = {
   mouLifecycle: '',
+  sifcCategory: '',
   dateFrom: '',
   dateTo: '',
 }
@@ -107,6 +108,7 @@ export default function SectorLeadDashboard() {
             mou_lifecycle_statuses: DEFAULT_MOU_LIFECYCLE_STATUSES,
             cooperation_modes: [],
             conferences: [],
+            sifc_categories: [],
           })
         }
       })
@@ -164,6 +166,7 @@ export default function SectorLeadDashboard() {
         mou_lifecycle: advancedFilters.mouLifecycle,
         cooperation_mode: cooperationModeFilter,
         conference_key: conferenceFilter,
+        sifc_category: advancedFilters.sifcCategory,
         q: searchQuery,
         date_from: advancedFilters.dateFrom,
         date_to: advancedFilters.dateTo,
@@ -419,6 +422,9 @@ export default function SectorLeadDashboard() {
           selectedConference={selectedConference}
           mouLifecycle={advancedFilters.mouLifecycle}
           onMouLifecycleChange={(v) => setAdvanced('mouLifecycle', v)}
+          sifcCategory={advancedFilters.sifcCategory}
+          onSifcCategoryChange={(v) => setAdvanced('sifcCategory', v)}
+          sifcCategories={filterOptions?.sifc_categories || []}
           cooperationMode={cooperationModeFilter}
           onCooperationModeChange={setCooperationModeFilter}
           cooperationModeFilters={cooperationModeFilters}
@@ -451,6 +457,7 @@ export default function SectorLeadDashboard() {
             showDocumentLinks={false}
             showWorkflowStatus={false}
             useConferenceDate
+            showSifcCategory
             onView={handleView}
             onOpenFile={openFile}
             renderActions={renderTableActions}

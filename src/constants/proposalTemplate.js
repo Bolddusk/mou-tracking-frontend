@@ -169,10 +169,10 @@ export function getEngagementLabel(value) {
 export function getProposalDisplayTitle(proposal) {
   if (!proposal) return '—'
   return (
-    proposal.display_title ||
     proposal.venture_name ||
+    proposal.pakistani_company ||
     proposal.company_name ||
-    proposal.proposal_title ||
+    proposal.display_title ||
     'Untitled'
   )
 }

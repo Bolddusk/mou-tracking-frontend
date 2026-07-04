@@ -61,13 +61,18 @@ export function getCooperationModeLabel(proposal) {
 
 export function getChineseCompany(proposal) {
   return displayOrDash(
-    proposal?.party_b_name || proposal?.party_b_organization || proposal?.party_b_info?.organization_name,
+    proposal?.chinese_company ||
+      proposal?.party_b_name ||
+      proposal?.party_b_organization ||
+      proposal?.party_b_info?.organization_name,
   )
 }
 
 export function getPakistaniCompany(proposal) {
   return displayOrDash(
-    proposal?.company_name || proposal?.party_a_info?.organization_name || proposal?.party_a_name,
+    proposal?.pakistani_company ||
+      proposal?.company_name ||
+      proposal?.party_a_info?.organization_name,
   )
 }
 
@@ -78,6 +83,12 @@ export function getProposalConferenceDate(proposal) {
 
 export function getProposalConferenceEndDate(proposal) {
   return proposal?.conference_info?.conference_end_date || proposal?.conference_end_date || null
+}
+
+export function getProposalSifcCategory(proposal) {
+  const top = proposal?.sifc_category
+  if (top != null && String(top).trim()) return String(top).trim()
+  return displayOrDash(parseExecutiveSummary(proposal).sifc_category)
 }
 
 export function formatProposalConferenceDate(proposal) {

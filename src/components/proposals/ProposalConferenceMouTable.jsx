@@ -26,9 +26,10 @@ export default function ProposalConferenceMouTable({
       <table className="min-w-[1100px] w-full text-left text-sm">
         <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
-            <th className="px-3 py-3 font-semibold">Party A (Pakistani)</th>
-            <th className="px-3 py-3 font-semibold">Party B (Chinese)</th>
+            <th className="px-3 py-3 font-semibold">Pakistani Company</th>
+            <th className="px-3 py-3 font-semibold">Chinese Company</th>
             <th className="px-3 py-3 font-semibold">Sector</th>
+            <th className="px-3 py-3 font-semibold">SIFC Category</th>
             <th className="px-3 py-3 font-semibold">Mode</th>
             <th className="px-3 py-3 font-semibold">MoU Value</th>
             <th className="px-3 py-3 font-semibold">Status</th>
@@ -53,6 +54,9 @@ export default function ProposalConferenceMouTable({
                 </td>
                 <td className="max-w-[140px] truncate px-3 py-3 text-slate-600" title={row.sector}>
                   {row.sector}
+                </td>
+                <td className="max-w-[140px] truncate px-3 py-3 text-slate-600" title={row.sifcCategory}>
+                  {row.sifcCategory}
                 </td>
                 <td className="px-3 py-3 text-slate-600">{row.cooperationMode}</td>
                 <td className="whitespace-nowrap px-3 py-3 text-slate-700">{row.mouValue}</td>

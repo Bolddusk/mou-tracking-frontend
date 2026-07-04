@@ -1,16 +1,23 @@
-export function getPartyADisplay(proposal) {
+/** Pakistani company column — never use party_a_name (import owner user). */
+export function getPakistaniCompanyDisplay(proposal) {
   if (!proposal) return '—'
-  const pa = proposal.party_a_info
-  if (pa?.contact_name || pa?.organization_name) {
-    return [pa.contact_name, pa.organization_name].filter(Boolean).join(' · ')
-  }
-  return proposal.party_a_name || '—'
+  return proposal.pakistani_company ?? proposal.company_name ?? '—'
 }
 
-export function getPartyBDisplay(proposal) {
+/** Chinese company column. */
+export function getChineseCompanyDisplay(proposal) {
   if (!proposal) return '—'
-  if (!proposal.party_b_name && !proposal.party_b_organization) return '—'
-  return [proposal.party_b_name, proposal.party_b_organization].filter(Boolean).join(' · ')
+  return proposal.chinese_company ?? proposal.party_b_name ?? '—'
+}
+
+/** @deprecated Use getPakistaniCompanyDisplay for list/table company columns. */
+export function getPartyADisplay(proposal) {
+  return getPakistaniCompanyDisplay(proposal)
+}
+
+/** @deprecated Use getChineseCompanyDisplay for list/table company columns. */
+export function getPartyBDisplay(proposal) {
+  return getChineseCompanyDisplay(proposal)
 }
 
 /** User-facing labels from API poke_status (backend may still say "poke"). */
