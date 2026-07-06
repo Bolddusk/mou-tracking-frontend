@@ -5,22 +5,15 @@ import {
   shouldShowConferenceMouDetails,
 } from '../../utils/mouConferenceFields'
 import OperationalStatusBadge from '../proposals/OperationalStatusBadge'
+import DetailField from './DetailField'
 
-function DetailField({ label, value, multiline = false, badge = false }) {
+function StatusDetailField({ label, value }) {
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
-      {badge ? (
-        <div className="mt-2">
-          <OperationalStatusBadge status={value} />
-        </div>
-      ) : (
-        <p
-          className={`mt-1.5 text-sm text-slate-800 ${multiline ? 'whitespace-pre-wrap' : ''}`}
-        >
-          {value}
-        </p>
-      )}
+      <div className="mt-2">
+        <OperationalStatusBadge status={value} />
+      </div>
     </div>
   )
 }
@@ -59,14 +52,16 @@ export default function MouConferenceDetailsSection({ proposal, conferences = []
         <DetailField label="Chinese Company" value={row.chineseCompany} />
         <DetailField label="Pakistani Company" value={row.pakistaniCompany} />
         <DetailField label="SIFC Category" value={row.sifcCategory} />
+        <DetailField label="Sector" value={row.sector} />
         <DetailField label="Agriculture Sub-Sector" value={row.agricultureSubSector} />
         <DetailField label="Cooperation Mode" value={row.cooperationMode} />
         <DetailField label="MoU Value" value={row.mouValue} />
         <DetailField label="Outcome / Description" value={row.outcome} multiline />
-        <DetailField label="Status" value={row.operationalStatus} badge />
+        <StatusDetailField label="Status" value={row.operationalStatus} />
         <DetailField label="Progress" value={row.progress} multiline />
         <DetailField label="Bottleneck" value={row.bottlenecks} multiline />
         <DetailField label="Tentative Timelines" value={row.tentativeTimeline} multiline />
+        <DetailField label="Location" value={row.location} />
       </div>
     </section>
   )

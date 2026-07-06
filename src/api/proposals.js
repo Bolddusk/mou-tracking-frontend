@@ -1,4 +1,5 @@
 import client from './client'
+import { buildChangeLogListParams } from '../utils/changeLogFilters'
 import { getProposalsListApi, PROPOSALS_LIST_API } from '../utils/rbac'
 
 function normalizePaginatedListResponse(body, params = {}) {
@@ -242,6 +243,158 @@ export async function downloadConferenceReportXlsx(conferenceKey) {
 export async function getProposalById(id) {
   const response = await client.get(`/api/proposals/${id}`)
   return response.data
+}
+
+export async function getProposalChangeLogs(proposalId, { limit = 50, offset = 0 } = {}) {
+  const response = await client.get(`/api/proposals/${proposalId}/change-logs`, {
+    params: { limit, offset },
+  })
+  return response.data
+}
+
+export async function getChangeLogsFilterOptions() {
+  const response = await client.get('/api/proposals/change-logs/filter-options')
+  return response.data
+}
+
+/** Admin / Super Admin — latest changes across all MOUs (newest first). */
+export async function getRecentChangeLogs(filters = {}) {
+  const { limit = 50, offset = 0, ...rest } = filters
+  const response = await client.get('/api/proposals/change-logs/recent', {
+    params: buildChangeLogListParams(rest, { limit, offset }),
+  })
+  return response.data
+}
+
+/** Sector Lead — changes within assigned jurisdiction. */
+export async function getSectorChangeLogs(filters = {}) {
+  const { limit = 50, offset = 0, ...rest } = filters
+  const response = await client.get('/api/proposals/change-logs/sector', {
+    params: buildChangeLogListParams(rest, { limit, offset }),
+  })
+  return response.data
+}
+
+/** @deprecated Use getRecentChangeLogs — MOU picker no longer needed in UI. */
+export async function getChangeLogsMouOptions({ limit = 100, q, offset = 0 } = {}) {
+  const params = { limit, offset }
+  const trimmed = q?.trim()
+  if (trimmed) params.q = trimmed
+  const response = await client.get('/api/proposals/change-logs/mou-options', { params })
+  return response.data
+}
+
+/** Party A / others — timeline of their own MOU edits. */
+export async function getMyChangeLogs({ limit = 50, offset = 0 } = {}) {
+  const response = await client.get('/api/proposals/change-logs/mine', {
+    params: { limit, offset },
+  })
+  return response.data
+}
+
+/**
+ * Fetch change logs export blob — same filter params as list APIs.
+ * @param {'csv'|'xlsx'} format
+ */
+export async function fetchChangeLogsExport(filters = {}, format = 'csv') {
+  const normalized = format === 'xls' ? 'xlsx' : format
+  const params = { ...buildChangeLogListParams(filters), format: normalized }
+
+  const response = await client.get('/api/proposals/change-logs/export', {
+    params,
+    responseType: 'blob',
+  })
+
+  const today = new Date().toISOString().slice(0, 10)
+  const defaultName =
+    normalized === 'xlsx'
+      ? `mou-change-logs-filtered-${today}.xlsx`
+      : `mou-change-logs-general-${today}.csv`
+  const defaultMime =
+    normalized === 'xlsx'
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'text/csv'
+
+  const filename = filenameFromContentDisposition(
+    response.headers['content-disposition'],
+    defaultName,
+  )
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || defaultMime,
+  })
+
+  return { blob, filename, mime: blob.type, format: normalized }
+}
+
+/**
+ * Export change logs — same filter params as list APIs (no limit/offset).
+ * @param {'csv'|'xlsx'} format
+ */
+export async function downloadChangeLogsExport(filters = {}, format = 'csv') {
+  const { blob, filename } = await fetchChangeLogsExport(filters, format)
+  const objectUrl = URL.createObjectURL(blob)
+  triggerFileDownload(objectUrl, filename)
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+}
+
+/** Preview uses CSV so the report can render in-browser. */
+export async function fetchChangeLogsExportPreviewText(filters = {}) {
+  const { blob } = await fetchChangeLogsExport(filters, 'csv')
+  return blob.text()
+}
+
+function parseChangeLogExportResponse(response, { defaultName, defaultMime, format }) {
+  const filename = filenameFromContentDisposition(
+    response.headers['content-disposition'],
+    defaultName,
+  )
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || defaultMime,
+  })
+  return { blob, filename, mime: blob.type, format }
+}
+
+/**
+ * Export change logs for a single MOU (History tab).
+ * Primary: GET /api/proposals/:id/change-logs/export
+ */
+export async function fetchProposalChangeLogsExport(
+  proposalId,
+  format = 'xlsx',
+  { proposalLabel } = {},
+) {
+  const normalized = format === 'xls' ? 'xlsx' : format
+  const today = new Date().toISOString().slice(0, 10)
+  const defaultName =
+    normalized === 'xlsx'
+      ? `mou-${proposalId}-change-logs-${today}.xlsx`
+      : `mou-${proposalId}-change-logs-${today}.csv`
+  const defaultMime =
+    normalized === 'xlsx'
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'text/csv'
+
+  const response = await client.get(`/api/proposals/${proposalId}/change-logs/export`, {
+    params: { format: normalized },
+    responseType: 'blob',
+  })
+  return parseChangeLogExportResponse(response, { defaultName, defaultMime, format: normalized })
+}
+
+export async function downloadProposalChangeLogsExport(
+  proposalId,
+  format = 'xlsx',
+  options = {},
+) {
+  const { blob, filename } = await fetchProposalChangeLogsExport(proposalId, format, options)
+  const objectUrl = URL.createObjectURL(blob)
+  triggerFileDownload(objectUrl, filename)
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+}
+
+export async function fetchProposalChangeLogsExportPreviewText(proposalId, options = {}) {
+  const { blob } = await fetchProposalChangeLogsExport(proposalId, 'csv', options)
+  return blob.text()
 }
 
 export async function getProposalEditableFields(id) {

@@ -7,6 +7,8 @@ import ProposalOpportunitiesFilterBar from '../../components/proposals/ProposalO
 import ProposalOpportunitiesPagination from '../../components/proposals/ProposalOpportunitiesPagination'
 import ProposalOpportunitiesTable from '../../components/proposals/ProposalOpportunitiesTable'
 import ProposalConferenceMouTable from '../../components/proposals/ProposalConferenceMouTable'
+import MouChangeLogsPanel from '../../components/proposals/MouChangeLogsPanel'
+import OpportunitiesDashboardTabs from '../../components/proposals/OpportunitiesDashboardTabs'
 import ProposalOpportunitiesToolbar from '../../components/proposals/ProposalOpportunitiesToolbar'
 import {
   buildCooperationModeFilters,
@@ -76,6 +78,7 @@ export default function SectorLeadDashboard() {
   const [actionLoading, setActionLoading] = useState(false)
   const [partyBCredentials, setPartyBCredentials] = useState(null)
   const [partyBCredentialsSubtitle, setPartyBCredentialsSubtitle] = useState('')
+  const [dashboardView, setDashboardView] = useState('opportunities')
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchInput), 300)
@@ -406,6 +409,12 @@ export default function SectorLeadDashboard() {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <OpportunitiesDashboardTabs active={dashboardView} onChange={setDashboardView} />
+
+        {dashboardView === 'change-logs' ? (
+          <MouChangeLogsPanel />
+        ) : (
+          <>
         <ProposalOpportunitiesToolbar
           title={listToolbarTitle}
           search={searchInput}
@@ -475,6 +484,8 @@ export default function SectorLeadDashboard() {
           onNext={() => setPage((p) => p + 1)}
           loading={loading}
         />
+          </>
+        )}
       </div>
 
       <FilePreviewModal

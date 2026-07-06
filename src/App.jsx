@@ -277,7 +277,7 @@ export default function App() {
 
           <Route
             element={
-              <PermissionShell title="Proposal Detail" permissions={ROUTE_ACCESS.proposalDetail} />
+              <PermissionShell title="MOU" permissions={ROUTE_ACCESS.proposalDetail} />
             }
           >
             <Route path="/proposals/:id" element={<ProposalDetail />} />

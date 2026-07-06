@@ -24,6 +24,8 @@ import ProposalExportReportModal from '../../components/proposal/ProposalExportR
 import MmMouPanel from '../../components/matchmaking/MmMouPanel'
 import MmMouStatusBadge from '../../components/matchmaking/MmMouStatusBadge'
 import ProposalDetailPanel from '../../components/ProposalDetailPanel'
+import ProposalChangeLogTimeline from '../../components/proposals/ProposalChangeLogTimeline'
+import ProposalChangeLogReportActions from '../../components/proposals/ProposalChangeLogReportActions'
 import PokeStatusBadge from '../../components/PokeStatusBadge'
 import StatusBadge from '../../components/StatusBadge'
 import { useAuth } from '../../context/AuthContext'
@@ -110,6 +112,7 @@ export default function ProposalDetail() {
   const [mouStatus, setMouStatus] = useState(null)
   const [contactsEditorOpen, setContactsEditorOpen] = useState(false)
   const [fieldsEditorOpen, setFieldsEditorOpen] = useState(false)
+  const [changeLogRefreshKey, setChangeLogRefreshKey] = useState(0)
   const [credentialModal, setCredentialModal] = useState(null)
   const credentialQueueRef = useRef([])
 
@@ -207,9 +210,12 @@ export default function ProposalDetail() {
   const canEditPartyContacts = Boolean(proposal?.capabilities?.can_edit_party_contacts)
   const canEditFields = Boolean(proposal?.capabilities?.can_edit_fields)
   const canManagePartyContacts = canEditPartyContacts || isSuperAdmin
+  const canViewCompanies = isSuperAdmin || isSectorLead
   const isAdminRole = isSuperAdmin || user?.role === ROLES.ADMIN
 
   const openFieldsEditor = () => setFieldsEditorOpen(true)
+
+  const bumpChangeLogs = () => setChangeLogRefreshKey((k) => k + 1)
 
   const handleFieldsSaved = (res) => {
     if (res?.proposal) {
@@ -220,6 +226,7 @@ export default function ProposalDetail() {
       }))
     }
     setSuccess(res?.message || 'Proposal fields updated successfully')
+    bumpChangeLogs()
   }
 
   const enqueueCredentialPrompts = (prompts) => {
@@ -234,14 +241,22 @@ export default function ProposalDetail() {
     else setCredentialModal(null)
   }
 
-  const handlePartyContactsSaved = (res) => {
+  const handlePartyContactsSaved = async (res) => {
     setProposal((prev) => mergeProposalAfterPartyContacts(prev, res))
+
+    try {
+      const refreshed = await proposalsApi.getProposalById(id)
+      setProposal(refreshed)
+    } catch {
+      // merge above is enough if refetch fails
+    }
 
     const { success, errors } = getPartyContactSaveFeedback(res)
     setSuccess(success)
     if (errors.length) setError(errors.join(' '))
 
     enqueueCredentialPrompts(buildCredentialPrompts(res.party_a, res.party_b))
+    bumpChangeLogs()
   }
 
   const activeTab = useMemo(() => {
@@ -249,8 +264,10 @@ export default function ProposalDetail() {
     if (tab === 'chat' && canChat) return 'chat'
     if (tab === 'mou' && canMou) return 'mou'
     if (tab === 'activities') return 'activities'
+    if (tab === 'history') return 'history'
+    if (tab === 'companies' && canViewCompanies) return 'companies'
     return 'details'
-  }, [searchParams, canChat, canMou])
+  }, [searchParams, canChat, canMou, canViewCompanies])
 
   const setTab = (tab) => {
     if (tab === 'chat' && canChat) {
@@ -259,6 +276,10 @@ export default function ProposalDetail() {
       setSearchParams({ tab: 'mou' }, { replace: true })
     } else if (tab === 'activities') {
       setSearchParams({ tab: 'activities' }, { replace: true })
+    } else if (tab === 'history') {
+      setSearchParams({ tab: 'history' }, { replace: true })
+    } else if (tab === 'companies' && canViewCompanies) {
+      setSearchParams({ tab: 'companies' }, { replace: true })
     } else {
       setSearchParams({}, { replace: true })
     }
@@ -332,6 +353,7 @@ export default function ProposalDetail() {
       setMouStatus('deal_closed')
       setSuccess(res?.message || 'Deal closed successfully')
       await load()
+      bumpChangeLogs()
     },
     [load],
   )
@@ -786,6 +808,11 @@ export default function ProposalDetail() {
         <DetailTabButton active={activeTab === 'details'} onClick={() => setTab('details')}>
           Details
         </DetailTabButton>
+        {canViewCompanies && (
+          <DetailTabButton active={activeTab === 'companies'} onClick={() => setTab('companies')}>
+            Companies
+          </DetailTabButton>
+        )}
         {canTrackActivities && (
           <DetailTabButton active={activeTab === 'activities'} onClick={() => setTab('activities')}>
             Activities
@@ -806,9 +833,32 @@ export default function ProposalDetail() {
             MOU
           </DetailTabButton>
         )}
+        <DetailTabButton active={activeTab === 'history'} onClick={() => setTab('history')}>
+          Change History
+        </DetailTabButton>
       </div>
 
-      {activeTab === 'mou' ? (
+      {activeTab === 'history' ? (
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Change History</h2>
+              <p className="text-sm text-slate-500">
+                Audit trail — field-level before and after values
+              </p>
+            </div>
+            <ProposalChangeLogReportActions
+              proposalId={Number(id)}
+              proposalLabel={proposal ? getProposalDisplayTitle(proposal) : ''}
+            />
+          </div>
+          <ProposalChangeLogTimeline
+            proposalId={Number(id)}
+            enabled={activeTab === 'history'}
+            refreshKey={changeLogRefreshKey}
+          />
+        </section>
+      ) : activeTab === 'companies' ? (
         <div className="space-y-6">
           {proposal && (
             <ProposalMouPartyCards
@@ -817,6 +867,37 @@ export default function ProposalDetail() {
               onEditContacts={() => setContactsEditorOpen(true)}
             />
           )}
+          {canManagePartyContacts && (
+            <div className="flex flex-col gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1 text-sm text-green-900">
+                {needsPartyAAccountSetup(proposal) && (
+                  <p>
+                    <strong>Party A not linked</strong> — enter contact name + email to create
+                    their portal login.
+                  </p>
+                )}
+                {!proposal.party_b_user_id && (
+                  <p>
+                    <strong>Party B not linked</strong> — add their email and save to enable chat
+                    login.
+                  </p>
+                )}
+                {!needsPartyAAccountSetup(proposal) && proposal.party_b_user_id && (
+                  <p>You can update Party A and Party B contact details for this proposal.</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setContactsEditorOpen(true)}
+                className="shrink-0 rounded-lg bg-portal-primary px-4 py-2 text-sm font-semibold text-white hover:bg-portal-primary-hover"
+              >
+                Edit contacts
+              </button>
+            </div>
+          )}
+        </div>
+      ) : activeTab === 'mou' ? (
+        <div className="space-y-6">
           <MmMouPanel
           matchId={isMatchmakingMou ? mmMatch?.id : undefined}
           proposalId={isDirectMou ? id : undefined}
@@ -913,43 +994,6 @@ export default function ProposalDetail() {
         </section>
       ) : (
         <>
-          {(isSuperAdmin || isSectorLead) && proposal && (
-            <ProposalMouPartyCards
-              proposal={proposal}
-              canEditContacts={canManagePartyContacts}
-              onEditContacts={() => setContactsEditorOpen(true)}
-            />
-          )}
-
-          {canManagePartyContacts && (
-            <div className="flex flex-col gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1 text-sm text-green-900">
-                {needsPartyAAccountSetup(proposal) && (
-                  <p>
-                    <strong>Party A not linked</strong> — enter contact name + email to create
-                    their portal login.
-                  </p>
-                )}
-                {!proposal.party_b_user_id && (
-                  <p>
-                    <strong>Party B not linked</strong> — add their email and save to enable chat
-                    login.
-                  </p>
-                )}
-                {!needsPartyAAccountSetup(proposal) && proposal.party_b_user_id && (
-                  <p>You can update Party A and Party B contact details for this proposal.</p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setContactsEditorOpen(true)}
-                className="shrink-0 rounded-lg bg-portal-primary px-4 py-2 text-sm font-semibold text-white hover:bg-portal-primary-hover"
-              >
-                Edit contacts
-              </button>
-            </div>
-          )}
-
           <ProposalDetailPanel
             proposal={proposal}
             conferences={conferences}

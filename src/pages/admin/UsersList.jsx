@@ -7,7 +7,7 @@ import Alert from '../../components/Alert'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import UserRoleBadge from '../../components/UserRoleBadge'
 import { ROLES } from '../../constants/sectors'
-import { getPartyAProfilePaths } from '../../constants/profileRoutes'
+import { getPartyAProfilePaths, getPartyBProfilePaths } from '../../constants/profileRoutes'
 import { formatDate, getErrorMessage } from '../../utils/format'
 
 function PartyAProfileStatusBadge({ user, profileMeta }) {
@@ -50,7 +50,8 @@ export default function UsersList() {
   const [roleFilter, setRoleFilter] = useState('')
   const [search, setSearch] = useState('')
 
-  const profilePaths = getPartyAProfilePaths(ROLES.SUPER_ADMIN)
+  const partyAProfilePaths = getPartyAProfilePaths(ROLES.SUPER_ADMIN)
+  const partyBProfilePaths = getPartyBProfilePaths(ROLES.SUPER_ADMIN)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -206,7 +207,17 @@ export default function UsersList() {
                           <button
                             type="button"
                             title="View Party A Profile"
-                            onClick={() => navigate(profilePaths.detail(u.id))}
+                            onClick={() => navigate(partyAProfilePaths.detail(u.id))}
+                            className="rounded-lg border border-green-200 px-2.5 py-1 text-[11px] font-semibold text-green-800 hover:bg-green-50"
+                          >
+                            View Profile
+                          </button>
+                        )}
+                        {u.role === ROLES.PARTY_B && (
+                          <button
+                            type="button"
+                            title="View Party B Profile"
+                            onClick={() => navigate(partyBProfilePaths.detail(u.id))}
                             className="rounded-lg border border-green-200 px-2.5 py-1 text-[11px] font-semibold text-green-800 hover:bg-green-50"
                           >
                             View Profile

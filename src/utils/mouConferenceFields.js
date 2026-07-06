@@ -62,9 +62,9 @@ export function getCooperationModeLabel(proposal) {
 export function getChineseCompany(proposal) {
   return displayOrDash(
     proposal?.chinese_company ||
+      proposal?.party_b_info?.organization_name ||
       proposal?.party_b_name ||
-      proposal?.party_b_organization ||
-      proposal?.party_b_info?.organization_name,
+      proposal?.party_b_organization,
   )
 }
 
@@ -114,6 +114,7 @@ export function getMouConferenceRow(proposal) {
     progress: displayOrDash(es.progress),
     bottlenecks: displayOrDash(es.bottlenecks),
     tentativeTimeline: displayOrDash(es.tentative_timeline),
+    location: displayOrDash(es.location),
     sector: displayOrDash(proposal?.sector),
     mouLifecycleLabel: displayOrDash(proposal?.mou_lifecycle_label || proposal?.mou_lifecycle),
   }

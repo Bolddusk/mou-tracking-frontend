@@ -5,10 +5,15 @@ export function mergeProposalAfterPartyContacts(prev, res) {
     ...prev,
     ...updated,
     party_a_info: { ...prev.party_a_info, ...updated.party_a_info },
+    party_b_info: { ...prev.party_b_info, ...updated.party_b_info },
     party_a_id: updated.party_a_id ?? prev.party_a_id,
     party_a_name: updated.party_a_name ?? prev.party_a_name,
     party_a_email: updated.party_a_email ?? prev.party_a_email,
     party_b_user_id: updated.party_b_user_id ?? prev.party_b_user_id,
+    party_a_contacts_display: updated.party_a_contacts_display ?? prev.party_a_contacts_display,
+    party_b_contacts_display: updated.party_b_contacts_display ?? prev.party_b_contacts_display,
+    party_a_profile: updated.party_a_profile ?? prev.party_a_profile,
+    party_b_profile: updated.party_b_profile ?? prev.party_b_profile,
     capabilities: res.capabilities ?? prev.capabilities,
   }
 }
