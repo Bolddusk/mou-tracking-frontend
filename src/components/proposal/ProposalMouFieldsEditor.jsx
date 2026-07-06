@@ -111,6 +111,7 @@ export default function ProposalMouFieldsEditor({
 
   const editable = catalog?.editable !== false
   const locked = catalog?.locked === true
+  const canChangeSector = catalog?.can_change_sector === true
 
   const setScalar = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
   const setEs = (key, value) =>
@@ -120,7 +121,7 @@ export default function ProposalMouFieldsEditor({
     }))
 
   const handleSave = async () => {
-    const patch = buildProposalFieldsPatch(baseline, form, { isAdmin })
+    const patch = buildProposalFieldsPatch(baseline, form, { isAdmin, canChangeSector })
     if (!Object.keys(patch).length) {
       onClose?.()
       return
@@ -167,18 +168,27 @@ export default function ProposalMouFieldsEditor({
 
         <Section title="Sector & agreement">
           <label className="block">
-            <FieldLabel>Sector</FieldLabel>
+            <FieldLabel hint={!canChangeSector ? 'admin only' : undefined}>Sector</FieldLabel>
             <select
               value={form.sector}
               onChange={(e) => setScalar('sector', e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
+              disabled={!canChangeSector || catalogLoading}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600"
             >
-              <option value="">Select sector…</option>
-              {sectors.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+              {!canChangeSector && form.sector ? (
+                <option value={form.sector}>{form.sector}</option>
+              ) : (
+                <option value="">Select sector…</option>
+              )}
+              {canChangeSector &&
+                sectors.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              {canChangeSector && form.sector && !sectors.includes(form.sector) && (
+                <option value={form.sector}>{form.sector} (current)</option>
+              )}
             </select>
           </label>
           <div className="grid gap-3 sm:grid-cols-3">

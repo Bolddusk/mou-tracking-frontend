@@ -50,11 +50,16 @@ function normalizeScalar(value) {
   return String(value).trim()
 }
 
-export function buildProposalFieldsPatch(baseline, current, { isAdmin = false } = {}) {
+export function buildProposalFieldsPatch(
+  baseline,
+  current,
+  { isAdmin = false, canChangeSector = false } = {},
+) {
   const patch = {}
 
   for (const key of SCALAR_FORM_KEYS) {
     if (key === 'external_reference' && !isAdmin) continue
+    if (key === 'sector' && !canChangeSector) continue
     const before = normalizeScalar(baseline[key])
     const after = normalizeScalar(current[key])
     if (before !== after) {

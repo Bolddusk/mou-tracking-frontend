@@ -6,7 +6,7 @@
 - **Partial update** — sirf changed fields bhejo.
 - **Deal closed** (`status=completed` / `mou_status=deal_closed`) → edit block (sirf `super_admin` / `admin` override).
 - **`status`** (draft/submitted/approved/…) is API se change **nahi** hota — approve/reject/resubmit alag endpoints.
-- **Sector lead** sector tabhi change kar sakta hai jo uske `assigned_sectors` mein ho.
+- **`sector`** sirf `super_admin` / `admin` change kar sakte hain — **sector lead sector change nahi kar sakta**.
 - **`external_reference`** sirf `super_admin` / `admin`.
 
 ---
@@ -34,13 +34,24 @@
       "project_type": ["Greenfield", "Brownfield"],
       "engagement_type": ["G2G", "B2B", "B2G", "G2B"]
     },
-    "admin_only_fields": ["external_reference"]
+    "admin_only_fields": ["external_reference", "sector"]
   },
+  "can_change_sector": true,
   "sectors": ["Agri-chemicals & Inputs", "..."]
 }
 ```
 
-UI: `editable === false` → read-only; `locked === true` → show lock message.
+UI:
+- `editable === false` → read-only; `locked === true` → show lock message.
+- **`can_change_sector === false`** (sector lead, party_a, etc.) → Sector dropdown **disabled/read-only**; `sectors` array empty.
+- **`catalog.admin_only_fields`** includes `"sector"` — hide or disable sector control for non-admin roles.
+
+**Frontend (`ProposalMouFieldsEditor.jsx`):**
+```js
+const canChangeSector = catalog?.can_change_sector === true
+// Sector dropdown: disabled={!canChangeSector}
+// PATCH: omit sector when !canChangeSector (buildProposalFieldsPatch)
+```
 
 ---
 
@@ -116,8 +127,8 @@ Har field par edit button: `capabilities.can_edit_fields === true`.
 
 | Role | Edit? |
 |------|-------|
-| super_admin, admin | All MOUs (locked override) |
-| sector_lead | MOUs in assigned sectors |
+| super_admin, admin | All MOUs (locked override); **can change sector** |
+| sector_lead | MOUs in assigned sectors (**sector read-only**) |
 | party_a | Own proposals |
 | party_b / investor | Linked MOUs (non-draft) |
 | focal_point / regional_focal_point | Match engagement MOUs (view = edit) |
@@ -130,7 +141,7 @@ Har field par edit button: `capabilities.can_edit_fields === true`.
 | Code | When |
 |------|------|
 | 400 | No fields / invalid enum / deal closed / empty sector |
-| 403 | No view access / sector outside SL scope / admin-only field |
+| 403 | No view access / admin-only field (`sector`, `external_reference`) |
 | 404 | Proposal not found |
 | 409 | Duplicate `external_reference` |
 
