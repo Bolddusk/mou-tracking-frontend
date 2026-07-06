@@ -94,9 +94,11 @@ export function getProposalSifcCategory(proposal) {
 export function formatProposalConferenceDate(proposal) {
   return formatDateOnlyRange(
     getProposalConferenceDate(proposal),
-    getProposalConferenceEndDate(proposal)
+    getProposalConferenceEndDate(proposal),
   )
 }
+
+export const MOU_OPERATIONAL_STATUS_OPTIONS = ['Active', 'Inactive', 'In Execution']
 
 export function getMouConferenceRow(proposal) {
   const es = parseExecutiveSummary(proposal)
@@ -106,7 +108,6 @@ export function getMouConferenceRow(proposal) {
     chineseCompany: getChineseCompany(proposal),
     pakistaniCompany: getPakistaniCompany(proposal),
     sifcCategory: displayOrDash(es.sifc_category),
-    agricultureSubSector: displayOrDash(proposal?.mou_sub_sector || proposal?.mou_scope),
     cooperationMode: getCooperationModeLabel(proposal),
     mouValue: formatMouValueUsd(proposal?.investment_value_usd),
     outcome: displayOrDash(outcome),

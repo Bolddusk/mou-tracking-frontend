@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as proposalsApi from '../../api/proposals'
 import { COOPERATION_MODE_LABELS } from '../../constants/proposalFilters'
+import { MOU_OPERATIONAL_STATUS_OPTIONS } from '../../utils/mouConferenceFields'
 import Alert from '../Alert'
 import Modal from '../Modal'
 import { getErrorMessage } from '../../utils/format'
@@ -105,11 +106,8 @@ export default function ProposalMouFieldsEditor({
   )
 
   const cooperationModes = catalog?.catalog?.enums?.cooperation_mode || ['mou', 'jv', 'agreement']
-  const operationalStatuses = catalog?.catalog?.enums?.mou_operational_status || [
-    'Active',
-    'Inactive',
-    'In Execution',
-  ]
+  const operationalStatuses =
+    catalog?.catalog?.enums?.mou_operational_status || MOU_OPERATIONAL_STATUS_OPTIONS
 
   const editable = catalog?.editable !== false
   const locked = catalog?.locked === true
@@ -183,7 +181,7 @@ export default function ProposalMouFieldsEditor({
               ))}
             </select>
           </label>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="block">
               <FieldLabel>Cooperation mode</FieldLabel>
               <select
@@ -191,7 +189,7 @@ export default function ProposalMouFieldsEditor({
                 onChange={(e) => setScalar('cooperation_mode', e.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
               >
-                <option value="">Select Mode</option>
+                <option value="">Select mode…</option>
                 {cooperationModes.map((mode) => (
                   <option key={mode} value={mode}>
                     {COOPERATION_MODE_LABELS[mode] || mode}
@@ -206,11 +204,21 @@ export default function ProposalMouFieldsEditor({
                 onChange={(v) => setScalar('investment_value_usd', v)}
               />
             </label>
+            <label className="block">
+              <FieldLabel>Status</FieldLabel>
+              <select
+                value={form.executive_summary.mou_operational_status || operationalStatuses[0]}
+                onChange={(e) => setEs('mou_operational_status', e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
+              >
+                {operationalStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          <label className="block">
-            <FieldLabel>Agriculture sub-sector</FieldLabel>
-            <TextInput value={form.mou_sub_sector} onChange={(v) => setScalar('mou_sub_sector', v)} />
-          </label>
         </Section>
 
         <Section title="Parties">
@@ -273,21 +281,6 @@ export default function ProposalMouFieldsEditor({
               {sifcCategories.map((cat) => (
                 <option key={cat.id || cat.name} value={cat.name}>
                   {cat.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <FieldLabel>Operational status</FieldLabel>
-            <select
-              value={form.executive_summary.mou_operational_status}
-              onChange={(e) => setEs('mou_operational_status', e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
-            >
-              <option value="">—</option>
-              {operationalStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
                 </option>
               ))}
             </select>

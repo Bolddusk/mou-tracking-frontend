@@ -11,7 +11,15 @@ import {
 import { resolveFileUrl } from '../utils/format'
 import { formatDate } from '../utils/format'
 
-export default function ProposalDetailPanel({ proposal, onOpenFile, conferences = [], onEditFields }) {
+export default function ProposalDetailPanel({
+  proposal,
+  onOpenFile,
+  conferences = [],
+  onEditFields,
+  canEditStatus = false,
+  onStatusChange,
+  statusSaving = false,
+}) {
   if (!proposal) return null
 
   const open = (url, title) => onOpenFile?.(url, title)
@@ -45,6 +53,9 @@ export default function ProposalDetailPanel({ proposal, onOpenFile, conferences 
         proposal={proposal}
         conferences={conferences}
         onEdit={onEditFields}
+        canEditStatus={canEditStatus}
+        onStatusChange={onStatusChange}
+        statusSaving={statusSaving}
       />
 
       <Section title="Engagement & Conference">
