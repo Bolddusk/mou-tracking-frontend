@@ -33,14 +33,6 @@ export default function Login() {
     <>
       <h2 className="mb-1 text-2xl font-bold text-slate-800">Sign in</h2>
       <p className="mb-6 text-sm text-slate-500">{PORTAL_SHORT} — all roles</p>
-      <div className="mb-4 rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-xs text-slate-600">
-        <p className="font-medium text-slate-600">Test logins (password: password123)</p>
-        <ul className="mt-1 space-y-0.5">
-          <li><strong>partya@test.com</strong> — Party A</li>
-          <li><strong>agri-chemicals-and-inputs-sectorlead@test.com</strong> — Sector Lead (Agri-chemicals & Inputs)</li>
-          <li><strong>superadmin@test.com</strong> — Super Admin</li>
-        </ul>
-      </div>
 
       <Alert type="error" message={error} onClose={() => setError('')} />
 
