@@ -1,17 +1,11 @@
 import { ROLE_LABELS } from '../constants/sectors'
 import { formatDate } from './format'
+import { normalizeLogChanges } from './changeLogTree'
 
 function escapeCsvCell(value) {
   const text = value == null || value === '' ? '' : String(value)
   if (/[",\r\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`
   return text
-}
-
-function normalizeLogChanges(log) {
-  const raw = log?.changes
-  if (Array.isArray(raw)) return raw.filter(Boolean)
-  if (raw && typeof raw === 'object') return Object.values(raw).filter(Boolean)
-  return []
 }
 
 function formatBeforeAfter(log) {

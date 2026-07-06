@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import * as proposalsApi from '../../api/proposals'
 import LoadingSpinner from '../LoadingSpinner'
 import { ROLE_LABELS } from '../../constants/sectors'
+import { buildFieldRevisionTree, normalizeLogChanges } from '../../utils/changeLogTree'
 import { formatDate, formatRelativeTime, getErrorMessage } from '../../utils/format'
+import ChangeLogFieldTree from './ChangeLogFieldTree'
 
 const PAGE_SIZE = 50
 const EMPTY_LIST_FILTERS = Object.freeze({})
@@ -13,14 +15,6 @@ function formatChangeValue(value) {
     return <span className="text-slate-400">—</span>
   }
   return <span className="break-words text-slate-700">{String(value)}</span>
-}
-
-/** Ensure changes is always an array (guards legacy object-shaped payloads). */
-function normalizeChanges(log) {
-  const raw = log?.changes
-  if (Array.isArray(raw)) return raw.filter(Boolean)
-  if (raw && typeof raw === 'object') return Object.values(raw).filter(Boolean)
-  return []
 }
 
 function proposalLinkLabel(log) {
@@ -77,7 +71,7 @@ function ChangeDetailsList({ details }) {
 
 function ChangeLogEntry({ log, showProposalLink = false, defaultExpanded = false }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
-  const changes = normalizeChanges(log)
+  const changes = normalizeLogChanges(log)
   const changeDetails = Array.isArray(log.change_details) ? log.change_details.filter(Boolean) : []
   const hasFieldChanges = changes.length > 0
   const hasDetails = hasFieldChanges || changeDetails.length > 0
@@ -179,6 +173,11 @@ export default function ProposalChangeLogTimeline({
   const [error, setError] = useState('')
 
   const listFiltersKey = useMemo(() => JSON.stringify(listFilters), [listFilters])
+  const useFieldTree = source === 'proposal'
+  const fieldGroups = useMemo(
+    () => (useFieldTree ? buildFieldRevisionTree(logs) : []),
+    [logs, useFieldTree],
+  )
 
   const showProposalLink = source === 'mine' || source === 'recent' || source === 'sector'
 
@@ -288,18 +287,26 @@ export default function ProposalChangeLogTimeline({
   return (
     <div className="px-2 py-4 sm:px-4">
       <ViewerScopeBanner viewerScope={viewerScope} />
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <p className="text-sm text-slate-600">
-          <span className="font-semibold text-slate-800">{total}</span> change
-          {total === 1 ? '' : 's'} recorded
-        </p>
-      </div>
-      <div className="relative">
-        <div className="absolute bottom-2 left-[11px] top-2 w-0.5 bg-green-200" />
-        {logs.map((log) => (
-          <ChangeLogEntry key={log.id} log={log} showProposalLink={showProposalLink} />
-        ))}
-      </div>
+
+      {useFieldTree ? (
+        <ChangeLogFieldTree groups={fieldGroups} editSessionCount={logs.length} />
+      ) : (
+        <>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <p className="text-sm text-slate-600">
+              <span className="font-semibold text-slate-800">{total}</span> change
+              {total === 1 ? '' : 's'} recorded
+            </p>
+          </div>
+          <div className="relative">
+            <div className="absolute bottom-2 left-[11px] top-2 w-0.5 bg-green-200" />
+            {logs.map((log) => (
+              <ChangeLogEntry key={log.id} log={log} showProposalLink={showProposalLink} />
+            ))}
+          </div>
+        </>
+      )}
+
       {hasMore && (
         <div className="mt-4 flex justify-center">
           <button

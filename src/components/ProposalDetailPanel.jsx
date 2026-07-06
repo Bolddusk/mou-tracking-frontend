@@ -16,9 +16,6 @@ export default function ProposalDetailPanel({
   onOpenFile,
   conferences = [],
   onEditFields,
-  canEditStatus = false,
-  onStatusChange,
-  statusSaving = false,
 }) {
   if (!proposal) return null
 
@@ -53,9 +50,6 @@ export default function ProposalDetailPanel({
         proposal={proposal}
         conferences={conferences}
         onEdit={onEditFields}
-        canEditStatus={canEditStatus}
-        onStatusChange={onStatusChange}
-        statusSaving={statusSaving}
       />
 
       <Section title="Engagement & Conference">

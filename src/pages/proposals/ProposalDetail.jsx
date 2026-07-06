@@ -112,7 +112,6 @@ export default function ProposalDetail() {
   const [mouStatus, setMouStatus] = useState(null)
   const [contactsEditorOpen, setContactsEditorOpen] = useState(false)
   const [fieldsEditorOpen, setFieldsEditorOpen] = useState(false)
-  const [statusSaving, setStatusSaving] = useState(false)
   const [changeLogRefreshKey, setChangeLogRefreshKey] = useState(0)
   const [credentialModal, setCredentialModal] = useState(null)
   const credentialQueueRef = useRef([])
@@ -229,25 +228,6 @@ export default function ProposalDetail() {
     setSuccess(res?.message || 'Proposal fields updated successfully')
     bumpChangeLogs()
   }
-
-  const handleOperationalStatusChange = useCallback(
-    async (status) => {
-      if (!proposal?.id) return
-      setStatusSaving(true)
-      setError('')
-      try {
-        const res = await proposalsApi.patchProposalFields(proposal.id, {
-          executive_summary: { mou_operational_status: status },
-        })
-        handleFieldsSaved(res)
-      } catch (err) {
-        setError(getErrorMessage(err))
-      } finally {
-        setStatusSaving(false)
-      }
-    },
-    [proposal?.id],
-  )
 
   const enqueueCredentialPrompts = (prompts) => {
     if (!prompts.length) return
@@ -1018,9 +998,6 @@ export default function ProposalDetail() {
             proposal={proposal}
             conferences={conferences}
             onEditFields={canEditFields ? openFieldsEditor : undefined}
-            canEditStatus={canEditFields}
-            onStatusChange={handleOperationalStatusChange}
-            statusSaving={statusSaving}
             onOpenFile={(url, title) => setFilePreview({ url, title })}
           />
         </>
