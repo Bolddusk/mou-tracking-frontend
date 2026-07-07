@@ -5,17 +5,35 @@ export const DEFAULT_PROGRESS_SHEET_COLUMNS = [
   { key: 'progress_date', label: 'Progress Date' },
   { key: 'title', label: 'Title' },
   { key: 'description', label: 'Description' },
+  { key: 'recorded_at', label: 'Recorded At' },
   { key: 'status', label: 'Status' },
   { key: 'added_by_name', label: 'Added By' },
-  { key: 'added_by_role', label: 'Added By Role' },
-  { key: 'source', label: 'Source' },
   { key: 'comments', label: 'Comments' },
 ]
 
-const HIDDEN_PROGRESS_COLUMN_KEYS = new Set(['support_file_url'])
+const HIDDEN_PROGRESS_COLUMN_KEYS = new Set([
+  'support_file_url',
+  'source',
+  'added_by_role',
+])
 
 export function filterProgressColumns(columns) {
   return (columns || []).filter((col) => !HIDDEN_PROGRESS_COLUMN_KEYS.has(col.key))
+}
+
+function ensureRecordedAtColumn(columns) {
+  const filtered = filterProgressColumns(columns)
+  if (filtered.some((col) => col.key === 'recorded_at')) return filtered
+  const recordedCol = { key: 'recorded_at', label: 'Recorded At' }
+  const descIdx = filtered.findIndex((col) => col.key === 'description')
+  if (descIdx >= 0) {
+    return [
+      ...filtered.slice(0, descIdx + 1),
+      recordedCol,
+      ...filtered.slice(descIdx + 1),
+    ]
+  }
+  return [...filtered, recordedCol]
 }
 
 export const PROGRESS_SOURCE_LABELS = {
@@ -43,7 +61,8 @@ function buildSheetRowFromUpdate(update) {
         id: update.id,
         progress_date: update.progress_date || update.activity_date || '',
         title: update.title || '',
-        description: update.description || '',
+        description: update.description || update.what_was_done || '',
+        recorded_at: update.recorded_at || '',
         status: update.status_label || update.status || 'Recorded',
         added_by_name: update.added_by_name || '',
         added_by_role: ROLE_LABELS[update.added_by_role] || update.added_by_role || '',
@@ -67,6 +86,30 @@ function buildSheetRowFromUpdate(update) {
   }
 }
 
+function progressRowSortValue(row, update) {
+  const recorded = row.recorded_at || update?.recorded_at
+  if (recorded) {
+    const t = new Date(recorded).getTime()
+    if (!Number.isNaN(t)) return t
+  }
+  const progressDate = row.progress_date || update?.activity_date || update?.progress_date
+  if (progressDate) {
+    const t = new Date(progressDate).getTime()
+    if (!Number.isNaN(t)) return t
+  }
+  const id = row.id ?? update?.id
+  return typeof id === 'number' ? id : 0
+}
+
+function sortProgressRowsNewestFirst(rows, updates) {
+  const updateById = new Map(updates.map((u) => [u.id, u]))
+  return [...rows].sort((a, b) => {
+    const aUpdate = updateById.get(a.id)
+    const bUpdate = updateById.get(b.id)
+    return progressRowSortValue(b, bUpdate) - progressRowSortValue(a, bUpdate)
+  })
+}
+
 /** Normalize GET /api/proposals/:id/activities — supports legacy `activities` array. */
 export function normalizeProgressListResponse(data) {
   const updates =
@@ -76,7 +119,7 @@ export function normalizeProgressListResponse(data) {
         ? data.activities
         : []
 
-  const columns = filterProgressColumns(
+  const columns = ensureRecordedAtColumn(
     Array.isArray(data?.sheet_columns) && data.sheet_columns.length
       ? data.sheet_columns
       : DEFAULT_PROGRESS_SHEET_COLUMNS,
@@ -90,6 +133,8 @@ export function normalizeProgressListResponse(data) {
       if (!update) return row
       return {
         ...row,
+        description: row.description || update.description || update.what_was_done || '',
+        recorded_at: row.recorded_at ?? update.recorded_at ?? '',
         comments: row.comments || plainCommentsText(update),
         can_edit: row.can_edit ?? update.can_edit,
         can_delete: row.can_delete ?? update.can_delete,
@@ -104,10 +149,31 @@ export function normalizeProgressListResponse(data) {
     rows = updates.map(buildSheetRowFromUpdate)
   }
 
+  rows = sortProgressRowsNewestFirst(rows, updates)
+  const sortedUpdates = [...updates].sort(
+    (a, b) =>
+      progressRowSortValue(
+        {
+          id: b.id,
+          recorded_at: b.recorded_at,
+          progress_date: b.progress_date || b.activity_date,
+        },
+        b,
+      ) -
+      progressRowSortValue(
+        {
+          id: a.id,
+          recorded_at: a.recorded_at,
+          progress_date: a.progress_date || a.activity_date,
+        },
+        a,
+      ),
+  )
+
   const count = typeof data?.count === 'number' ? data.count : updates.length
 
   return {
-    updates,
+    updates: sortedUpdates,
     rows,
     columns,
     count,
@@ -158,6 +224,20 @@ export function buildProgressReportTableData(rows, columns, updates = []) {
         }
         if (col.key === 'progress_date') {
           return formatDate(row[col.key]) || row[col.key] || '—'
+        }
+        if (col.key === 'recorded_at') {
+          const value = row[col.key] || update?.recorded_at
+          if (!value) return '—'
+          const d = new Date(value)
+          if (Number.isNaN(d.getTime())) return String(value)
+          return d.toLocaleString('en-PK', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          })
         }
         const value = row[col.key]
         return value != null && value !== '' ? String(value) : '—'

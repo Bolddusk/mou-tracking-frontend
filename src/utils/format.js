@@ -72,6 +72,21 @@ export function formatDate(value) {
   })
 }
 
+/** Date + time — falls back to API pre-formatted PKT strings. */
+export function formatDateTime(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value)
+  return d.toLocaleString('en-PK', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
 export function formatRelativeTime(value) {
   if (!value) return ''
   const d = new Date(value)

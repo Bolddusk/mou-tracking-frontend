@@ -5,6 +5,7 @@ import {
   shouldShowConferenceMouDetails,
 } from '../../utils/mouConferenceFields'
 import DetailField from './DetailField'
+import MouProgressValue from './MouProgressValue'
 
 export default function MouConferenceDetailsSection({
   proposal,
@@ -49,7 +50,9 @@ export default function MouConferenceDetailsSection({
         <DetailField label="MoU Value" value={row.mouValue} />
         <DetailField label="Status" value={row.operationalStatus} />
         <DetailField label="Outcome / Description" value={row.outcome} multiline />
-        <DetailField label="Progress" value={row.progress} multiline />
+        <DetailField label="Progress" multiline>
+          <MouProgressValue value={row.progress} />
+        </DetailField>
         <DetailField label="Bottleneck" value={row.bottlenecks} multiline />
         <DetailField label="Tentative Timelines" value={row.tentativeTimeline} multiline />
         <DetailField label="Location" value={row.location} />

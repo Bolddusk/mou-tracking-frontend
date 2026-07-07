@@ -1,7 +1,7 @@
 import { useMemo, useState, Fragment } from 'react'
 import DocLink from '../DocLink'
 import { ROLE_LABELS } from '../../constants/sectors'
-import { formatDate, resolveFileUrl } from '../../utils/format'
+import { formatDate, formatDateTime, resolveFileUrl } from '../../utils/format'
 import { formatProgressSource } from '../../utils/progressUpdates'
 import ProposalProgressReportActions from '../proposals/ProposalProgressReportActions'
 
@@ -134,6 +134,10 @@ function formatCellValue(key, value, { onOpenFile, title, update }) {
 
   if (key === 'progress_date') {
     return <span className="whitespace-nowrap">{formatDate(value) || value}</span>
+  }
+
+  if (key === 'recorded_at') {
+    return <span className="whitespace-nowrap">{formatDateTime(value)}</span>
   }
 
   if (key === 'description') {

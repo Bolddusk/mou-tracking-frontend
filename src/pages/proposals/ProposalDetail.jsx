@@ -27,6 +27,7 @@ import StatusBadge from '../../components/StatusBadge'
 import { useAuth } from '../../context/AuthContext'
 import { getEngagementLabel, getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { getPakistaniCompanyDisplay } from '../../utils/proposalDisplay'
+import MouProgressValue from '../../components/proposal/MouProgressValue'
 import { getMouConferenceRow } from '../../utils/mouConferenceFields'
 import { isMatchMouReady } from '../../constants/matchmaking'
 import { ROLES } from '../../constants/sectors'
@@ -566,16 +567,22 @@ export default function ProposalDetail() {
     }
   }
 
+  const refreshProgressAndProposal = useCallback(async () => {
+    await Promise.all([refetchProgress(), refetchProposal()])
+  }, [refetchProgress, refetchProposal])
+
   const handleAddActivity = async () => {
     if (!activityForm.title.trim()) return
     setActionLoading(true)
     setError('')
     const isPokeResponse = respondMode && respondPokeActivityId
     try {
+      const workDone = activityForm.description.trim()
       const payload = {
         activity_date: activityForm.activity_date,
         title: activityForm.title.trim(),
-        description: activityForm.description.trim() || undefined,
+        description: workDone || undefined,
+        what_was_done: workDone || undefined,
         support_file_url: activityForm.support_file_url || undefined,
         comment: activityForm.comment.trim() || undefined,
       }
@@ -590,9 +597,9 @@ export default function ProposalDetail() {
       setSuccess(
         isPokeResponse
           ? 'Update response saved — status marked as Answered'
-          : 'Progress update recorded'
+          : 'Progress update recorded — MOU Details updated',
       )
-      await load()
+      await refreshProgressAndProposal()
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -605,10 +612,12 @@ export default function ProposalDetail() {
     setActionLoading(true)
     setError('')
     try {
+      const workDone = form.description.trim()
       const res = await activitiesApi.updateActivity(progressEditTarget.id, {
         activity_date: form.activity_date,
         title: form.title.trim(),
-        description: form.description.trim() || undefined,
+        description: workDone || undefined,
+        what_was_done: workDone || undefined,
         support_file_url: form.support_file_url || undefined,
       })
       setProgressEditTarget(null)
@@ -617,11 +626,8 @@ export default function ProposalDetail() {
           ? 'Progress saved — MOU Details updated'
           : 'Progress update saved',
       )
-      if (res?.mou_sync?.synced) {
-        await refetchProposal()
-        bumpChangeLogs()
-      }
-      await refetchProgress()
+      await refreshProgressAndProposal()
+      bumpChangeLogs()
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -637,7 +643,7 @@ export default function ProposalDetail() {
       await activitiesApi.deleteActivity(progressDeleteTarget.id)
       setProgressDeleteTarget(null)
       setSuccess('Progress entry deleted')
-      await refetchProgress()
+      await refreshProgressAndProposal()
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -980,10 +986,16 @@ export default function ProposalDetail() {
             label="Submitted"
             value={formatDate(proposal.submitted_at || proposal.created_at)}
           />
-          <HeroStat
-            label="Progress"
-            value={canTrackProgress ? getMouConferenceRow(proposal).progress : '—'}
-          />
+          <div className="bg-white/5 px-6 py-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Progress</p>
+            <div className="mt-1">
+              {canTrackProgress ? (
+                <MouProgressValue value={getMouConferenceRow(proposal).progress} variant="hero" />
+              ) : (
+                <p className="text-sm font-semibold text-white">—</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
