@@ -3,14 +3,7 @@ import { Link, useNavigate, useParams, useLocation, useSearchParams } from 'reac
 import * as activitiesApi from '../../api/activities'
 import * as mmApi from '../../api/matchmaking'
 import * as proposalsApi from '../../api/proposals'
-import {
-  ActionGroup,
-  ApproveIcon,
-  IconButton,
-  RejectIcon,
-} from '../../components/ActionIcons'
 import Alert from '../../components/Alert'
-import DocLink from '../../components/DocLink'
 import FilePreviewModal from '../../components/FilePreviewModal'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import Modal from '../../components/Modal'
@@ -19,8 +12,11 @@ import ProposalChatPanel from '../../components/proposal/ProposalChatPanel'
 import ProposalMouPartyCards from '../../components/proposal/ProposalMouPartyCards'
 import ProposalMouFieldsEditor from '../../components/proposal/ProposalMouFieldsEditor'
 import ProposalPartyContactsEditor from '../../components/proposal/ProposalPartyContactsEditor'
+import ProposalProgressPanel from '../../components/proposal/ProposalProgressPanel'
+import ProposalProgressEditModal from '../../components/proposal/ProposalProgressEditModal'
 import ProposalExportMenu from '../../components/proposal/ProposalExportMenu'
 import ProposalExportReportModal from '../../components/proposal/ProposalExportReportModal'
+import ProposalSifcReportPreviewModal from '../../components/proposal/ProposalSifcReportPreviewModal'
 import MmMouPanel from '../../components/matchmaking/MmMouPanel'
 import MmMouStatusBadge from '../../components/matchmaking/MmMouStatusBadge'
 import ProposalDetailPanel from '../../components/ProposalDetailPanel'
@@ -31,9 +27,10 @@ import StatusBadge from '../../components/StatusBadge'
 import { useAuth } from '../../context/AuthContext'
 import { getEngagementLabel, getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { getPakistaniCompanyDisplay } from '../../utils/proposalDisplay'
+import { getMouConferenceRow } from '../../utils/mouConferenceFields'
 import { isMatchMouReady } from '../../constants/matchmaking'
-import { ROLE_LABELS, ROLES } from '../../constants/sectors'
-import { formatDate, getErrorMessage, resolveFileUrl } from '../../utils/format'
+import { ROLES } from '../../constants/sectors'
+import { formatDate, getErrorMessage } from '../../utils/format'
 import { formatUpdateRequestLabel } from '../../utils/proposalDisplay'
 import { loadDraftFromProposal } from '../../utils/proposalDraft'
 import {
@@ -42,12 +39,14 @@ import {
   mergeProposalAfterPartyContacts,
   needsPartyAAccountSetup,
 } from '../../utils/partyContactProvision'
+import { normalizeProgressListResponse } from '../../utils/progressUpdates'
 
-const ACTIVITY_STATUS_STYLES = {
-  pending: 'bg-amber-100 text-amber-800 ring-amber-200',
-  approved: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
-  rejected: 'bg-red-100 text-red-800 ring-red-200',
-}
+const EMPTY_PROGRESS = Object.freeze({
+  updates: [],
+  rows: [],
+  columns: [],
+  count: 0,
+})
 
 /** Matchmaking engagement proposals only — skip for legacy direct MOUs. */
 function shouldLoadEngagementMatch(proposal) {
@@ -80,7 +79,7 @@ export default function ProposalDetail() {
 
   const [proposal, setProposal] = useState(null)
   const [conferences, setConferences] = useState([])
-  const [activities, setActivities] = useState([])
+  const [progress, setProgress] = useState(EMPTY_PROGRESS)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -99,25 +98,30 @@ export default function ProposalDetail() {
   const [activityUploading, setActivityUploading] = useState(false)
 
   const [filePreview, setFilePreview] = useState(null)
-  const [approveTarget, setApproveTarget] = useState(null)
-  const [approveComment, setApproveComment] = useState('')
-  const [rejectTarget, setRejectTarget] = useState(null)
-  const [rejectComment, setRejectComment] = useState('')
-  const [commentDrafts, setCommentDrafts] = useState({})
-  const [expandedComments, setExpandedComments] = useState({})
-  const [expandedActivityId, setExpandedActivityId] = useState(null)
   const [exportPreview, setExportPreview] = useState(null)
+  const [sifcPreview, setSifcPreview] = useState(null)
   const [exportLoading, setExportLoading] = useState(false)
+  const [sifcPreviewLoading, setSifcPreviewLoading] = useState(false)
+  const [progressEditTarget, setProgressEditTarget] = useState(null)
+  const [progressDeleteTarget, setProgressDeleteTarget] = useState(null)
+  const [unlockRequestTarget, setUnlockRequestTarget] = useState(null)
+  const [unlockNote, setUnlockNote] = useState('')
+  const [progressCommentTarget, setProgressCommentTarget] = useState(null)
+  const [progressCommentText, setProgressCommentText] = useState('')
   const [mmMatch, setMmMatch] = useState(null)
   const [mouStatus, setMouStatus] = useState(null)
   const [contactsEditorOpen, setContactsEditorOpen] = useState(false)
   const [fieldsEditorOpen, setFieldsEditorOpen] = useState(false)
+  const [archiveModalOpen, setArchiveModalOpen] = useState(false)
+  const [archiveReason, setArchiveReason] = useState('')
+  const [restoreModalOpen, setRestoreModalOpen] = useState(false)
   const [changeLogRefreshKey, setChangeLogRefreshKey] = useState(0)
   const [credentialModal, setCredentialModal] = useState(null)
   const credentialQueueRef = useRef([])
 
   const canReview = isSectorLead || isSuperAdmin
-  const canExportReport = canReview
+  const isAdminRole = isSuperAdmin || user?.role === ROLES.ADMIN
+  const canExportReport = canReview || isAdminRole
   const canPoke = canReview
 
   const isRfpEngagement = useMemo(() => {
@@ -166,15 +170,30 @@ export default function ProposalDetail() {
 
   const canMou = isMatchmakingMou || isDirectMou
 
+  const canUploadMou = Boolean(proposal?.capabilities?.can_upload_mou)
+  const canEditMouFields = Boolean(proposal?.capabilities?.can_edit_mou_fields)
+
   const canEditMou = useMemo(() => {
     if (!canMou || isDealClosed) return false
     if (isDirectMou) {
-      return Boolean(proposal?.capabilities?.can_upload_mou)
+      return canUploadMou || canEditMouFields
     }
     if (mouStatus === 'deal_closed') return false
-    if (proposal?.capabilities?.can_upload_mou) return true
+    if (canUploadMou || canEditMouFields) return true
     return isPartyA || isPartyB || isSectorLead || isSuperAdmin
-  }, [canMou, isDirectMou, isDealClosed, proposal, mouStatus, isPartyA, isPartyB, isSectorLead, isSuperAdmin])
+  }, [
+    canMou,
+    isDirectMou,
+    isDealClosed,
+    canUploadMou,
+    canEditMouFields,
+    proposal,
+    mouStatus,
+    isPartyA,
+    isPartyB,
+    isSectorLead,
+    isSuperAdmin,
+  ])
 
   const canCloseDeal = useMemo(() => {
     if (isDealClosed) return false
@@ -205,19 +224,35 @@ export default function ProposalDetail() {
     user?.id,
   ])
 
-  const canMarkSigned = (isSectorLead || isSuperAdmin) && !isDealClosed
+  const canMarkSigned = canEditMouFields && !isDealClosed
 
   const canEditPartyContacts = Boolean(proposal?.capabilities?.can_edit_party_contacts)
-  const canEditFields = Boolean(proposal?.capabilities?.can_edit_fields)
+  const isArchived = proposal?.is_archived === true
+  const canArchiveProposal = Boolean(proposal?.capabilities?.can_archive_proposal)
+  const canRestoreProposal = Boolean(proposal?.capabilities?.can_restore_proposal)
+  const canEditFields =
+    !isArchived && Boolean(proposal?.capabilities?.can_edit_fields)
   const canManagePartyContacts = canEditPartyContacts || isSuperAdmin
   const canViewCompanies = isSuperAdmin || isSectorLead
-  const isAdminRole = isSuperAdmin || user?.role === ROLES.ADMIN
 
   const openFieldsEditor = () => setFieldsEditorOpen(true)
 
   const bumpChangeLogs = () => setChangeLogRefreshKey((k) => k + 1)
 
-  const handleFieldsSaved = (res) => {
+  const refetchProgress = useCallback(async () => {
+    if (!id) return
+    const actRes = await activitiesApi.getProposalActivities(id)
+    setProgress(normalizeProgressListResponse(actRes))
+  }, [id])
+
+  const refetchProposal = useCallback(async () => {
+    if (!id) return null
+    const refreshed = await proposalsApi.getProposalById(id)
+    setProposal(refreshed)
+    return refreshed
+  }, [id])
+
+  const handleFieldsSaved = async (res) => {
     if (res?.proposal) {
       setProposal((prev) => ({
         ...prev,
@@ -227,6 +262,52 @@ export default function ProposalDetail() {
     }
     setSuccess(res?.message || 'Proposal fields updated successfully')
     bumpChangeLogs()
+    try {
+      await refetchProgress()
+    } catch {
+      // non-blocking — main save already succeeded
+    }
+  }
+
+  const handleArchiveProposal = async () => {
+    setActionLoading(true)
+    setError('')
+    try {
+      const res = await proposalsApi.archiveProposal(id, archiveReason)
+      setArchiveModalOpen(false)
+      setArchiveReason('')
+      navigate(dashboardPath, {
+        state: { success: res?.message || 'MOU archived successfully' },
+      })
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleRestoreProposal = async () => {
+    setActionLoading(true)
+    setError('')
+    try {
+      const res = await proposalsApi.restoreProposal(id)
+      if (res?.proposal) {
+        setProposal((prev) => ({
+          ...prev,
+          ...res.proposal,
+          capabilities: res.capabilities || prev?.capabilities,
+        }))
+      } else {
+        await refetchProposal()
+      }
+      setRestoreModalOpen(false)
+      setSuccess(res?.message || 'MOU restored')
+      bumpChangeLogs()
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   const enqueueCredentialPrompts = (prompts) => {
@@ -263,7 +344,7 @@ export default function ProposalDetail() {
     const tab = searchParams.get('tab')
     if (tab === 'chat' && canChat) return 'chat'
     if (tab === 'mou' && canMou) return 'mou'
-    if (tab === 'activities') return 'activities'
+    if (tab === 'progress' || tab === 'activities') return 'progress'
     if (tab === 'history') return 'history'
     if (tab === 'companies' && canViewCompanies) return 'companies'
     return 'details'
@@ -274,8 +355,8 @@ export default function ProposalDetail() {
       setSearchParams({ tab: 'chat' }, { replace: true })
     } else if (tab === 'mou' && canMou) {
       setSearchParams({ tab: 'mou' }, { replace: true })
-    } else if (tab === 'activities') {
-      setSearchParams({ tab: 'activities' }, { replace: true })
+    } else if (tab === 'progress') {
+      setSearchParams({ tab: 'progress' }, { replace: true })
     } else if (tab === 'history') {
       setSearchParams({ tab: 'history' }, { replace: true })
     } else if (tab === 'companies' && canViewCompanies) {
@@ -294,7 +375,7 @@ export default function ProposalDetail() {
         activitiesApi.getProposalActivities(id),
       ])
       setProposal(prop)
-      setActivities(actRes.activities || [])
+      setProgress(normalizeProgressListResponse(actRes))
 
       if (shouldLoadEngagementMatch(prop)) {
         try {
@@ -378,19 +459,6 @@ export default function ProposalDetail() {
   }, [])
 
   useEffect(() => {
-    if (activities.length === 0) {
-      setExpandedActivityId(null)
-      return
-    }
-    const pokeId = proposal?.poke_status?.poke_activity_id
-    if (pokeId && activities.some((a) => a.id === pokeId)) {
-      setExpandedActivityId(pokeId)
-      return
-    }
-    setExpandedActivityId(activities[activities.length - 1].id)
-  }, [activities, proposal?.poke_status?.poke_activity_id])
-
-  useEffect(() => {
     if (
       location.state?.respondToPoke &&
       proposal?.poke_status?.status === 'pending_response' &&
@@ -437,6 +505,20 @@ export default function ProposalDetail() {
       setError(getErrorMessage(err))
     } finally {
       setExportLoading(false)
+    }
+  }
+
+  const handlePreviewSifcReport = async () => {
+    if (!proposal?.id) return
+    setSifcPreviewLoading(true)
+    setError('')
+    try {
+      const report = await proposalsApi.getProposalSifcReport(proposal.id)
+      setSifcPreview(report)
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setSifcPreviewLoading(false)
     }
   }
 
@@ -508,7 +590,7 @@ export default function ProposalDetail() {
       setSuccess(
         isPokeResponse
           ? 'Update response saved — status marked as Answered'
-          : 'Activity update recorded'
+          : 'Progress update recorded'
       )
       await load()
     } catch (err) {
@@ -518,16 +600,28 @@ export default function ProposalDetail() {
     }
   }
 
-  const handleApproveActivity = async () => {
-    if (!approveTarget) return
+  const handleEditProgressSave = async (form) => {
+    if (!progressEditTarget?.id) return
     setActionLoading(true)
     setError('')
     try {
-      await activitiesApi.approveActivity(approveTarget.id, approveComment.trim())
-      setApproveTarget(null)
-      setApproveComment('')
-      setSuccess('Activity approved')
-      await load()
+      const res = await activitiesApi.updateActivity(progressEditTarget.id, {
+        activity_date: form.activity_date,
+        title: form.title.trim(),
+        description: form.description.trim() || undefined,
+        support_file_url: form.support_file_url || undefined,
+      })
+      setProgressEditTarget(null)
+      setSuccess(
+        res?.mou_sync?.synced
+          ? 'Progress saved — MOU Details updated'
+          : 'Progress update saved',
+      )
+      if (res?.mou_sync?.synced) {
+        await refetchProposal()
+        bumpChangeLogs()
+      }
+      await refetchProgress()
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -535,16 +629,15 @@ export default function ProposalDetail() {
     }
   }
 
-  const handleRejectActivity = async () => {
-    if (!rejectTarget || !rejectComment.trim()) return
+  const handleDeleteProgress = async () => {
+    if (!progressDeleteTarget?.id) return
     setActionLoading(true)
     setError('')
     try {
-      await activitiesApi.rejectActivity(rejectTarget.id, rejectComment.trim())
-      setRejectTarget(null)
-      setRejectComment('')
-      setSuccess('Activity rejected')
-      await load()
+      await activitiesApi.deleteActivity(progressDeleteTarget.id)
+      setProgressDeleteTarget(null)
+      setSuccess('Progress entry deleted')
+      await refetchProgress()
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -552,30 +645,66 @@ export default function ProposalDetail() {
     }
   }
 
-  const handleAddComment = async (activityId) => {
-    const text = commentDrafts[activityId]
-    if (!text?.trim()) return
+  const handleRequestUnlock = async () => {
+    if (!unlockRequestTarget?.id) return
     setActionLoading(true)
     setError('')
     try {
-      await activitiesApi.addActivityComment(activityId, text.trim())
-      setCommentDrafts((d) => ({ ...d, [activityId]: '' }))
-      await load()
+      await activitiesApi.requestEditUnlock(unlockRequestTarget.id, unlockNote.trim())
+      setUnlockRequestTarget(null)
+      setUnlockNote('')
+      setSuccess('Edit access requested — waiting for Super Admin approval')
+      await refetchProgress()
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
       setActionLoading(false)
     }
   }
+
+  const handleGrantUnlock = async (update) => {
+    if (!update?.id) return
+    setActionLoading(true)
+    setError('')
+    try {
+      await activitiesApi.grantEditUnlock(update.id)
+      setSuccess('Edit access granted')
+      await refetchProgress()
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleAddProgressComment = async () => {
+    if (!progressCommentTarget?.id || !progressCommentText.trim()) return
+    setActionLoading(true)
+    setError('')
+    try {
+      await activitiesApi.addActivityComment(progressCommentTarget.id, progressCommentText.trim())
+      setProgressCommentTarget(null)
+      setProgressCommentText('')
+      setSuccess('Comment added')
+      await refetchProgress()
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const canCommentOnProgress =
+    (canReview || isAdminRole) && !isRfpEngagement && !isDealClosed
 
   const pendingPokeActivityId = useMemo(() => {
     if (proposal?.poke_status?.status !== 'pending_response') return null
     if (proposal.poke_status.poke_activity_id) return proposal.poke_status.poke_activity_id
-    for (let i = activities.length - 1; i >= 0; i--) {
-      if (activities[i].can_respond) return activities[i].id
+    for (let i = progress.updates.length - 1; i >= 0; i--) {
+      if (progress.updates[i].can_respond) return progress.updates[i].id
     }
     return null
-  }, [activities, proposal?.poke_status])
+  }, [progress.updates, proposal?.poke_status])
 
   if (loading) {
     return (
@@ -602,14 +731,14 @@ export default function ProposalDetail() {
   const isDraft = proposal.status === 'draft'
   const isRejected = proposal.status === 'rejected'
   const canPartyAEditRejected = isPartyA && isRejected && !mmMatch
-  const canTrackActivities = proposal.status !== 'draft'
-  const canWriteActivities =
-    canTrackActivities &&
+  const canTrackProgress = proposal.status !== 'draft'
+  const canWriteProgress =
+    canTrackProgress &&
     !isRfpEngagement &&
     !isDealClosed &&
+    !isArchived &&
     proposal.capabilities?.can_add_activity !== false
-  const canPokeActions = canPoke && canWriteActivities
-  const pendingCount = activities.filter((a) => a.status === 'pending').length
+  const canPokeActions = canPoke && canWriteProgress
   const backPath = isRfpEngagement ? '/matchmaking/matches' : dashboardPath
   const backLabel = isRfpEngagement ? 'Matches' : 'Dashboard'
 
@@ -632,9 +761,17 @@ export default function ProposalDetail() {
               Edit MOU fields
             </button>
           )}
-          {canExportReport && canWriteActivities && (
+          {canExportReport && canWriteProgress && (
             <>
               <ProposalExportMenu proposalId={proposal?.id} onError={setError} />
+              <button
+                type="button"
+                onClick={handlePreviewSifcReport}
+                disabled={sifcPreviewLoading}
+                className="inline-flex items-center gap-2 rounded-lg border border-green-700/30 bg-green-50 px-4 py-2 text-sm font-semibold text-green-900 shadow-sm hover:bg-green-100 disabled:opacity-60"
+              >
+                {sifcPreviewLoading ? 'Loading…' : 'Preview SIFC report'}
+              </button>
               <button
                 type="button"
                 onClick={handlePreviewExport}
@@ -655,13 +792,13 @@ export default function ProposalDetail() {
               🔔 Request for Update
             </button>
           )}
-          {canWriteActivities && (
+          {canWriteProgress && (
             <button
               type="button"
               onClick={() => openActivityModal(false)}
               className="inline-flex items-center gap-2 rounded-lg bg-portal-primary px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm hover:bg-green-400"
             >
-              + Add Activity
+              + Add Progress Update
             </button>
           )}
           {isMatchmakingEngagement && mmMatch?.id && (
@@ -672,12 +809,53 @@ export default function ProposalDetail() {
               Open match MOU
             </Link>
           )}
+          {canRestoreProposal && (
+            <button
+              type="button"
+              onClick={() => setRestoreModalOpen(true)}
+              disabled={actionLoading}
+              className="inline-flex items-center gap-2 rounded-lg border border-green-700/30 bg-green-50 px-4 py-2 text-sm font-semibold text-green-900 shadow-sm hover:bg-green-100 disabled:opacity-60"
+            >
+              Restore MOU
+            </button>
+          )}
+          {canArchiveProposal && (
+            <button
+              type="button"
+              onClick={() => setArchiveModalOpen(true)}
+              disabled={actionLoading}
+              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 shadow-sm hover:bg-red-100 disabled:opacity-60"
+            >
+              Archive MOU
+            </button>
+          )}
         </div>
       </div>
 
+      {isArchived && (
+        <div className="rounded-lg border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-800">
+          <p className="font-semibold">This MOU is archived</p>
+          <p className="mt-1 text-slate-600">
+            Archived MOUs are hidden from Sector Leads and parties. Super Admin can view and restore.
+          </p>
+          {(proposal.archived_reason || proposal.archived_at) && (
+            <p className="mt-2 text-xs text-slate-500">
+              {proposal.archived_reason && (
+                <span>
+                  Reason:{' '}
+                  <span className="font-medium text-slate-700">{proposal.archived_reason}</span>
+                </span>
+              )}
+              {proposal.archived_reason && proposal.archived_at ? ' · ' : ''}
+              {proposal.archived_at && <span>Archived {formatDate(proposal.archived_at)}</span>}
+            </p>
+          )}
+        </div>
+      )}
+
       {isRfpEngagement && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-          <strong>Read-only engagement view</strong> — China RFP can monitor chat and activities.
+          <strong>Read-only engagement view</strong> — China RFP can monitor chat and progress updates.
           MOU upload is handled by Party A, Party B, and Sector Lead.
         </div>
       )}
@@ -782,6 +960,11 @@ export default function ProposalDetail() {
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
+              {isArchived && (
+                <span className="rounded-full bg-slate-500/80 px-2.5 py-0.5 text-[11px] font-semibold text-white ring-1 ring-white/20">
+                  Archived
+                </span>
+              )}
               <StatusBadge status={proposal.status} />
               {canMou && mouStatus && <MmMouStatusBadge status={mouStatus} />}
               <PokeStatusBadge pokeStatus={proposal.poke_status} variant="onDark" />
@@ -798,8 +981,8 @@ export default function ProposalDetail() {
             value={formatDate(proposal.submitted_at || proposal.created_at)}
           />
           <HeroStat
-            label="Activities"
-            value={canTrackActivities ? `${activities.length} (${pendingCount} pending)` : '—'}
+            label="Progress"
+            value={canTrackProgress ? getMouConferenceRow(proposal).progress : '—'}
           />
         </div>
       </div>
@@ -813,14 +996,9 @@ export default function ProposalDetail() {
             Companies
           </DetailTabButton>
         )}
-        {canTrackActivities && (
-          <DetailTabButton active={activeTab === 'activities'} onClick={() => setTab('activities')}>
-            Activities
-            {pendingCount > 0 && (
-              <span className="ml-1.5 inline-flex rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
-                {pendingCount}
-              </span>
-            )}
+        {canTrackProgress && (
+          <DetailTabButton active={activeTab === 'progress'} onClick={() => setTab('progress')}>
+            Progress
           </DetailTabButton>
         )}
         {canChat && (
@@ -902,6 +1080,8 @@ export default function ProposalDetail() {
           matchId={isMatchmakingMou ? mmMatch?.id : undefined}
           proposalId={isDirectMou ? id : undefined}
           canEdit={canEditMou}
+          canUploadMou={canUploadMou}
+          canEditMouFields={canEditMouFields}
           canMarkSigned={canMarkSigned}
           canCloseDeal={canCloseDeal}
           onStatusChange={setMouStatus}
@@ -915,83 +1095,32 @@ export default function ProposalDetail() {
           currentUserId={user?.id}
           enabled={activeTab === 'chat' && canChat}
         />
-      ) : activeTab === 'activities' ? (
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-800">Activity Log</h2>
-              <p className="text-sm text-slate-500">Progress updates and review history</p>
-            </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              {activities.length} entries
-            </span>
-          </div>
-
-          <div className="px-2 py-2 sm:px-4">
-            {activities.length === 0 ? (
-              <EmptyState
-                icon="📭"
-                title="No activities yet"
-                text="Add a progress update or request an update from Party A."
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-[760px] w-full text-left text-sm">
-                  <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th className="whitespace-nowrap px-4 py-3 font-semibold">Date</th>
-                      <th className="px-4 py-3 font-semibold">Update</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-semibold">Added by</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-semibold">Status</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-semibold text-right">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {activities.map((activity) => (
-                      <ActivityTableRow
-                        key={activity.id}
-                        activity={activity}
-                        isExpanded={expandedActivityId === activity.id}
-                        onToggleExpand={() =>
-                          setExpandedActivityId((prev) =>
-                            prev === activity.id ? null : activity.id,
-                          )
-                        }
-                        canReview={canReview && !isRfpEngagement && !isDealClosed}
-                        canComment={!isRfpEngagement && !isDealClosed}
-                        actionLoading={actionLoading}
-                        expanded={expandedComments[activity.id]}
-                        commentDraft={commentDrafts[activity.id] || ''}
-                        onToggleComments={() =>
-                          setExpandedComments((e) => ({ ...e, [activity.id]: !e[activity.id] }))
-                        }
-                        onCommentDraftChange={(val) =>
-                          setCommentDrafts((d) => ({ ...d, [activity.id]: val }))
-                        }
-                        onAddComment={() => handleAddComment(activity.id)}
-                        onOpenFile={(url, title) =>
-                          setFilePreview({ url: resolveFileUrl(url), title })
-                        }
-                        onApprove={() => {
-                          setApproveTarget(activity)
-                          setApproveComment('')
-                        }}
-                        onReject={() => {
-                          setRejectTarget(activity)
-                          setRejectComment('')
-                        }}
-                        showRespondToPoke={isPartyA && activity.can_respond}
-                        onRespondToPoke={() => openActivityModal(true, activity.id)}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </section>
+      ) : activeTab === 'progress' ? (
+        <ProposalProgressPanel
+          proposalId={canTrackProgress ? proposal.id : undefined}
+          proposalLabel={getProposalDisplayTitle(proposal)}
+          rows={progress.rows}
+          columns={progress.columns}
+          updates={progress.updates}
+          count={progress.count}
+          actionLoading={actionLoading}
+          onOpenFile={(url, title) => setFilePreview({ url, title })}
+          isPartyA={isPartyA}
+          pokeActivityId={pendingPokeActivityId}
+          onRespondToPoke={(activityId) => openActivityModal(true, activityId)}
+          onEdit={(update) => setProgressEditTarget(update)}
+          onDelete={(update) => setProgressDeleteTarget(update)}
+          onComment={(update) => {
+            setProgressCommentTarget(update)
+            setProgressCommentText('')
+          }}
+          canComment={canCommentOnProgress}
+          onRequestUnlock={(update) => {
+            setUnlockRequestTarget(update)
+            setUnlockNote('')
+          }}
+          onGrantUnlock={handleGrantUnlock}
+        />
       ) : (
         <>
           <ProposalDetailPanel
@@ -1005,7 +1134,7 @@ export default function ProposalDetail() {
 
       <Modal
         open={showAddActivity}
-        title={respondMode ? 'Respond to Update Request' : 'Add Activity Update'}
+        title={respondMode ? 'Respond to Update Request' : 'Add Progress Update'}
         onClose={closeActivityModal}
         onConfirm={handleAddActivity}
         confirmLabel={respondMode ? 'Submit Response' : 'Submit Update'}
@@ -1104,6 +1233,15 @@ export default function ProposalDetail() {
         onExportError={setError}
       />
 
+      <ProposalSifcReportPreviewModal
+        open={Boolean(sifcPreview)}
+        report={sifcPreview}
+        proposalId={proposal?.id}
+        proposalLabel={getProposalDisplayTitle(proposal)}
+        onClose={() => setSifcPreview(null)}
+        onError={setError}
+      />
+
       <FilePreviewModal
         open={Boolean(filePreview)}
         title={filePreview?.title}
@@ -1128,6 +1266,126 @@ export default function ProposalDetail() {
         onSaved={handleFieldsSaved}
       />
 
+      <ProposalProgressEditModal
+        open={Boolean(progressEditTarget)}
+        initial={progressEditTarget}
+        loading={actionLoading}
+        onClose={() => setProgressEditTarget(null)}
+        onSave={handleEditProgressSave}
+      />
+
+      <Modal
+        open={Boolean(progressDeleteTarget)}
+        title="Delete progress entry"
+        onClose={() => setProgressDeleteTarget(null)}
+        onConfirm={handleDeleteProgress}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        loading={actionLoading}
+      >
+        <p className="text-sm text-slate-600">
+          Delete <strong>{progressDeleteTarget?.title}</strong>? This cannot be undone.
+        </p>
+      </Modal>
+
+      <Modal
+        open={Boolean(progressCommentTarget)}
+        title="Add comment"
+        onClose={() => {
+          setProgressCommentTarget(null)
+          setProgressCommentText('')
+        }}
+        onConfirm={handleAddProgressComment}
+        confirmLabel="Post comment"
+        loading={actionLoading}
+        confirmDisabled={!progressCommentText.trim()}
+      >
+        <p className="mb-3 text-sm text-slate-600">
+          Comment on <strong>{progressCommentTarget?.title}</strong>. Multiple comments are
+          allowed — they appear in the Comments column and expanded thread.
+        </p>
+        {isSuperAdmin && progressCommentTarget?.added_by_role === 'sector_lead' && (
+          <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            Super Admin comments on Sector Lead progress lock the row until you grant edit access.
+          </p>
+        )}
+        <textarea
+          rows={3}
+          value={progressCommentText}
+          onChange={(e) => setProgressCommentText(e.target.value)}
+          placeholder="e.g. Please update bottleneck details"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+        />
+      </Modal>
+
+      <Modal
+        open={Boolean(unlockRequestTarget)}
+        title="Request edit access"
+        onClose={() => {
+          setUnlockRequestTarget(null)
+          setUnlockNote('')
+        }}
+        onConfirm={handleRequestUnlock}
+        confirmLabel="Send request"
+        loading={actionLoading}
+      >
+        <p className="mb-3 text-sm text-slate-600">
+          This row is locked after a Super Admin comment. Add an optional note for the unlock
+          request.
+        </p>
+        <textarea
+          rows={3}
+          value={unlockNote}
+          onChange={(e) => setUnlockNote(e.target.value)}
+          placeholder="Please allow me to fix the progress description…"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+        />
+      </Modal>
+
+      <Modal
+        open={archiveModalOpen}
+        title="Archive MOU"
+        onClose={() => {
+          setArchiveModalOpen(false)
+          setArchiveReason('')
+        }}
+        onConfirm={handleArchiveProposal}
+        confirmLabel="Archive MOU"
+        confirmVariant="danger"
+        loading={actionLoading}
+      >
+        <p className="text-sm text-slate-600">
+          Archive <strong>{getProposalDisplayTitle(proposal)}</strong>? The record stays in the
+          database but is hidden from Sector Leads and parties.
+        </p>
+        <label className="mt-4 block">
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Reason (optional)
+          </span>
+          <input
+            type="text"
+            value={archiveReason}
+            onChange={(e) => setArchiveReason(e.target.value)}
+            placeholder="e.g. Duplicate"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
+          />
+        </label>
+      </Modal>
+
+      <Modal
+        open={restoreModalOpen}
+        title="Restore MOU"
+        onClose={() => setRestoreModalOpen(false)}
+        onConfirm={handleRestoreProposal}
+        confirmLabel="Restore MOU"
+        loading={actionLoading}
+      >
+        <p className="text-sm text-slate-600">
+          Restore <strong>{getProposalDisplayTitle(proposal)}</strong>? It will reappear for the
+          assigned Sector Lead and parties.
+        </p>
+      </Modal>
+
       <PartyBCredentialsModal
         open={Boolean(credentialModal)}
         title={credentialModal?.title}
@@ -1135,45 +1393,6 @@ export default function ProposalDetail() {
         subtitle={credentialModal?.subtitle}
         onClose={closeCredentialModal}
       />
-
-      <Modal
-        open={Boolean(approveTarget)}
-        title="Approve Activity"
-        onClose={() => setApproveTarget(null)}
-        onConfirm={handleApproveActivity}
-        confirmLabel="Approve"
-        loading={actionLoading}
-      >
-        <p className="mb-3 text-sm text-slate-600">
-          <strong>{approveTarget?.title}</strong>
-        </p>
-        <textarea
-          rows={3}
-          value={approveComment}
-          onChange={(e) => setApproveComment(e.target.value)}
-          placeholder="Optional comment"
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-        />
-      </Modal>
-
-      <Modal
-        open={Boolean(rejectTarget)}
-        title="Reject Activity"
-        onClose={() => setRejectTarget(null)}
-        onConfirm={handleRejectActivity}
-        confirmLabel="Reject"
-        confirmVariant="danger"
-        loading={actionLoading}
-        confirmDisabled={!rejectComment.trim()}
-      >
-        <textarea
-          rows={3}
-          value={rejectComment}
-          onChange={(e) => setRejectComment(e.target.value)}
-          placeholder="Rejection reason (required)"
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-        />
-      </Modal>
     </div>
   )
 }
@@ -1184,278 +1403,6 @@ function HeroStat({ label, value }) {
       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
       <p className="mt-1 truncate text-sm font-semibold text-white">{value}</p>
     </div>
-  )
-}
-
-function EmptyState({ icon, title, text }) {
-  return (
-    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 py-14 text-center">
-      <p className="text-3xl">{icon}</p>
-      <p className="mt-3 font-semibold text-slate-700">{title}</p>
-      <p className="mt-1 text-sm text-slate-500">{text}</p>
-    </div>
-  )
-}
-
-function ActivityTableRow({
-  activity,
-  isExpanded,
-  onToggleExpand,
-  canReview,
-  canComment = true,
-  actionLoading,
-  expanded,
-  commentDraft,
-  onToggleComments,
-  onCommentDraftChange,
-  onAddComment,
-  onOpenFile,
-  onApprove,
-  onReject,
-  showRespondToPoke,
-  onRespondToPoke,
-}) {
-  const statusStyle =
-    ACTIVITY_STATUS_STYLES[activity.status] || ACTIVITY_STATUS_STYLES.pending
-  const commentCount = activity.comments?.length || 0
-  const approvalCount = activity.approvals?.length || 0
-  const roleLabel = ROLE_LABELS[activity.added_by_role] || activity.added_by_role
-
-  return (
-    <>
-      <tr
-        className={`group transition-colors hover:bg-slate-50/80 ${
-          showRespondToPoke ? 'bg-amber-50/60' : ''
-        } ${isExpanded ? 'bg-slate-50/50' : ''}`}
-      >
-        <td className="whitespace-nowrap px-4 py-3 align-top text-slate-600">
-          <time className="text-xs font-medium">{formatDate(activity.activity_date)}</time>
-        </td>
-        <td className="max-w-[280px] px-4 py-3 align-top">
-          <button type="button" onClick={onToggleExpand} className="w-full text-left">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-semibold text-slate-800">{activity.title}</span>
-              {activity.is_poke && (
-                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
-                  Update request
-                </span>
-              )}
-            </div>
-            {!isExpanded && (
-              <p className="mt-0.5 truncate text-xs text-slate-500">
-                {activity.description ||
-                  (activity.poke_response && `Response: ${activity.poke_response.title}`) ||
-                  (activity.support_file_url && 'Proof attached') ||
-                  '—'}
-              </p>
-            )}
-          </button>
-          {activity.is_poke && activity.poke_response && !isExpanded && (
-            <p className="mt-1 text-xs text-green-800">
-              <span className="font-medium">Party A:</span> {activity.poke_response.title}
-            </p>
-          )}
-        </td>
-        <td className="whitespace-nowrap px-4 py-3 align-top">
-          <p className="font-medium text-slate-800">{activity.added_by_name}</p>
-          <p className="text-xs text-slate-500">{roleLabel}</p>
-        </td>
-        <td className="whitespace-nowrap px-4 py-3 align-top">
-          <span
-            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold capitalize ring-1 ring-inset ${statusStyle}`}
-          >
-            {activity.status}
-          </span>
-        </td>
-        <td className="whitespace-nowrap px-4 py-3 align-top text-right">
-          <div className="flex items-center justify-end gap-1">
-            {canReview && activity.status === 'pending' && (
-              <ActionGroup>
-                <IconButton
-                  variant="approve"
-                  title="Approve activity"
-                  disabled={actionLoading}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onApprove()
-                  }}
-                >
-                  <ApproveIcon />
-                </IconButton>
-                <IconButton
-                  variant="reject"
-                  title="Reject activity"
-                  disabled={actionLoading}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onReject()
-                  }}
-                >
-                  <RejectIcon />
-                </IconButton>
-              </ActionGroup>
-            )}
-            {commentCount > 0 && (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                {commentCount}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={onToggleExpand}
-              className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              title={isExpanded ? 'Collapse details' : 'Expand details'}
-              aria-expanded={isExpanded}
-            >
-              {isExpanded ? '▾' : '▸'}
-            </button>
-          </div>
-        </td>
-      </tr>
-
-      {showRespondToPoke && (
-        <tr className="bg-amber-50/80">
-          <td colSpan={5} className="border-t border-amber-100 px-4 py-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-amber-900">
-                Party A response needed — your answer will be saved on this update request.
-              </p>
-              <button
-                type="button"
-                onClick={onRespondToPoke}
-                className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
-              >
-                Respond to Update Request
-              </button>
-            </div>
-          </td>
-        </tr>
-      )}
-
-      {isExpanded && (
-        <tr className="bg-slate-50/40">
-          <td colSpan={5} className="border-t border-slate-100 px-4 py-4">
-            {activity.description && (
-              <p className="text-sm leading-relaxed text-slate-600">{activity.description}</p>
-            )}
-            {!activity.is_poke && activity.support_file_url && (
-              <div className={activity.description ? 'mt-2' : ''}>
-                <DocLink
-                  url={activity.support_file_url}
-                  title="View proof document"
-                  onOpen={(url) => onOpenFile(url, `Proof — ${activity.title}`)}
-                />
-              </div>
-            )}
-
-            {activity.is_poke && activity.poke_response && (
-              <div className="mt-3 rounded-lg border border-green-200 bg-green-50/60 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-green-800">
-                  Party A response
-                </p>
-                <div className="mt-2 space-y-2 text-sm text-slate-700">
-                  <p>
-                    <span className="font-semibold text-green-800">
-                      {formatDate(activity.poke_response.work_date)}
-                    </span>
-                    {' · '}
-                    <span className="font-semibold text-slate-800">
-                      {activity.poke_response.title}
-                    </span>
-                  </p>
-                  {activity.poke_response.description && (
-                    <p className="leading-relaxed text-slate-600">
-                      {activity.poke_response.description}
-                    </p>
-                  )}
-                  {activity.poke_response.support_file_url && (
-                    <DocLink
-                      url={activity.poke_response.support_file_url}
-                      title="View response proof document"
-                      onOpen={(url) =>
-                        onOpenFile(url, `Poke response — ${activity.poke_response.title}`)
-                      }
-                    />
-                  )}
-                  <p className="text-xs text-slate-500">
-                    Submitted by {activity.poke_response.submitted_by_name} ·{' '}
-                    {formatDate(activity.poke_response.submitted_at)}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {approvalCount > 0 && (
-              <div className="mt-4 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Reviews
-                </p>
-                {activity.approvals.map((a) => (
-                  <div
-                    key={a.id}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600"
-                  >
-                    <span className="font-semibold text-slate-800">{a.action_by_name}</span>{' '}
-                    <span className="capitalize text-slate-500">{a.action}</span> ·{' '}
-                    {formatDate(a.actioned_at)}
-                    {a.comment && (
-                      <p className="mt-1 italic text-slate-500">&ldquo;{a.comment}&rdquo;</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-4 border-t border-slate-200/80 pt-4">
-              <button
-                type="button"
-                onClick={onToggleComments}
-                className="text-xs font-semibold text-green-700 hover:text-green-900"
-              >
-                {expanded ? '▾ Hide comments' : '▸ Show comments'} ({commentCount})
-              </button>
-
-              {expanded && (
-                <div className="mt-3 space-y-3">
-                  {(activity.comments || []).map((c) => (
-                    <div
-                      key={c.id}
-                      className="rounded-lg border border-slate-100 bg-white p-3 shadow-sm"
-                    >
-                      <p className="text-sm font-semibold text-slate-800">{c.commented_by_name}</p>
-                      <p className="text-xs text-slate-400">
-                        {ROLE_LABELS[c.commented_by_role] || c.commented_by_role} ·{' '}
-                        {formatDate(c.created_at)}
-                      </p>
-                      <p className="mt-1.5 text-sm text-slate-600">{c.comment}</p>
-                    </div>
-                  ))}
-                  {canComment && (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={commentDraft}
-                        onChange={(e) => onCommentDraftChange(e.target.value)}
-                        placeholder="Write a comment…"
-                        className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
-                      />
-                      <button
-                        type="button"
-                        disabled={actionLoading || !(commentDraft || '').trim()}
-                        onClick={onAddComment}
-                        className="rounded-lg bg-sidebar px-4 py-2 text-xs font-bold text-white hover:bg-sidebar-hover disabled:opacity-50"
-                      >
-                        Post
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
   )
 }
 

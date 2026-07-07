@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import * as proposalsApi from '../../api/proposals'
 import Alert from '../../components/Alert'
@@ -52,6 +52,7 @@ const EMPTY_ADVANCED_FILTERS = {
 
 export default function SuperAdminDashboard() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { rbac } = useAuth()
   const listScope = useMemo(() => getProposalsListScope(rbac), [rbac])
   const pageTitle = useMemo(() => getOpportunitiesNavLabel(rbac), [rbac])
@@ -79,11 +80,18 @@ export default function SuperAdminDashboard() {
   const [partyBCredentials, setPartyBCredentials] = useState(null)
   const [partyBCredentialsSubtitle, setPartyBCredentialsSubtitle] = useState('')
   const [dashboardView, setDashboardView] = useState('opportunities')
+  const [archiveFilter, setArchiveFilter] = useState('')
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchInput), 300)
     return () => clearTimeout(timer)
   }, [searchInput])
+
+  useEffect(() => {
+    if (!location.state?.success) return
+    setSuccess(location.state.success)
+    navigate(location.pathname + location.search, { replace: true, state: null })
+  }, [location.state?.success, location.pathname, location.search, navigate])
 
   useEffect(() => {
     let cancelled = false
@@ -148,6 +156,8 @@ export default function SuperAdminDashboard() {
       q: searchQuery,
       date_from: advancedFilters.dateFrom,
       date_to: advancedFilters.dateTo,
+      include_deleted: archiveFilter === 'include_deleted' ? 1 : '',
+      archived_only: archiveFilter === 'archived_only' ? 1 : '',
       page,
       limit,
     })
@@ -163,6 +173,7 @@ export default function SuperAdminDashboard() {
     page,
     limit,
     listScope,
+    archiveFilter,
   ])
 
   const statusFilters = useMemo(() => {
@@ -173,7 +184,7 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, cooperationModeFilter, conferenceFilter, searchQuery, advancedFilters])
+  }, [statusFilter, cooperationModeFilter, conferenceFilter, searchQuery, advancedFilters, archiveFilter])
 
   const loadStats = useCallback(async () => {
     try {
@@ -231,7 +242,8 @@ export default function SuperAdminDashboard() {
     hasActiveAdvancedFilters ||
     Boolean(searchQuery.trim()) ||
     Boolean(cooperationModeFilter) ||
-    Boolean(conferenceFilter)
+    Boolean(conferenceFilter) ||
+    Boolean(archiveFilter)
 
   const emptyMessage = getProposalListEmptyMessage({
     totalCount: pagination?.total ?? proposals.length,
@@ -252,6 +264,7 @@ export default function SuperAdminDashboard() {
     setPage(1)
     setLimit(DEFAULT_PAGE_LIMIT)
     setAdvancedFilters(EMPTY_ADVANCED_FILTERS)
+    setArchiveFilter('')
   }
 
   const openFile = (url, title) => setFilePreview({ url, title })
@@ -444,6 +457,9 @@ export default function SuperAdminDashboard() {
           sectors={filterOptions?.sectors || []}
           mouLifecycleStatuses={mouLifecycleStatuses}
           hideSectorFilter={listScope !== 'all'}
+          showArchiveFilter={listScope === 'all'}
+          archiveFilter={archiveFilter}
+          onArchiveFilterChange={setArchiveFilter}
           onClearAll={clearAllFilters}
           hasActiveFilters={hasActiveFilters || Boolean(statusFilter)}
           onReportError={setError}

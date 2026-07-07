@@ -111,7 +111,9 @@ export default function ProposalMouFieldsEditor({
 
   const editable = catalog?.editable !== false
   const locked = catalog?.locked === true
-  const canChangeSector = catalog?.can_change_sector === true
+  const canChangeSector = catalogLoading
+    ? proposal?.capabilities?.can_change_sector === true
+    : catalog?.can_change_sector === true
 
   const setScalar = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
   const setEs = (key, value) =>

@@ -58,6 +58,9 @@ export default function ProposalOpportunitiesFilterBar({
   onClearAll,
   hasActiveFilters = false,
   hideSectorFilter = false,
+  showArchiveFilter = false,
+  archiveFilter = '',
+  onArchiveFilterChange,
   onReportError,
 }) {
   return (
@@ -154,6 +157,14 @@ export default function ProposalOpportunitiesFilterBar({
 
         <FilterDate label="From date" value={dateFrom} onChange={onDateFromChange} />
         <FilterDate label="To date" value={dateTo} onChange={onDateToChange} />
+
+        {showArchiveFilter && (
+          <FilterSelect label="Archive" value={archiveFilter} onChange={onArchiveFilterChange}>
+            <option value="">Active only</option>
+            <option value="include_deleted">Include archived</option>
+            <option value="archived_only">Archived only</option>
+          </FilterSelect>
+        )}
       </div>
 
       {hasActiveFilters && (

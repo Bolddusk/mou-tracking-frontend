@@ -84,6 +84,17 @@ export async function deleteProposal(id) {
   return response.data
 }
 
+export async function archiveProposal(id, reason) {
+  const body = reason?.trim() ? { reason: reason.trim() } : {}
+  const response = await client.patch(`/api/proposals/${id}/archive`, body)
+  return response.data
+}
+
+export async function restoreProposal(id) {
+  const response = await client.patch(`/api/proposals/${id}/restore`)
+  return response.data
+}
+
 export async function getSectorLeadProposals(status) {
   const { data } = await getSectorLeadProposalsPaginated(status ? { status } : {})
   return data
@@ -238,6 +249,63 @@ export async function downloadConferenceReportPdf(conferenceKey) {
 
 export async function downloadConferenceReportXlsx(conferenceKey) {
   return downloadConferenceReport(conferenceKey, 'xlsx', { attachment: true })
+}
+
+export async function getProposalSifcReport(proposalId) {
+  const response = await client.get(`/api/proposals/${proposalId}/sifc-report`, {
+    params: { format: 'json' },
+  })
+  return response.data
+}
+
+/**
+ * @param {number|string} proposalId
+ * @param {'pdf'|'xlsx'} format
+ * @param {{ attachment?: boolean }} [options]
+ */
+export async function downloadProposalSifcReport(proposalId, format, { attachment = false } = {}) {
+  const params = { format }
+  if (attachment) params.download = 1
+
+  const response = await client.get(`/api/proposals/${proposalId}/sifc-report`, {
+    params,
+    responseType: 'blob',
+  })
+
+  const defaultName =
+    format === 'xlsx'
+      ? `mou-${proposalId}-sifc-report.xlsx`
+      : `mou-${proposalId}-sifc-report.pdf`
+  const defaultMime =
+    format === 'xlsx'
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'application/pdf'
+
+  const filename = filenameFromContentDisposition(
+    response.headers['content-disposition'],
+    defaultName,
+  )
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || defaultMime,
+  })
+  const objectUrl = URL.createObjectURL(blob)
+
+  if (format === 'pdf' && !attachment) {
+    const tab = window.open(objectUrl, '_blank', 'noopener,noreferrer')
+    if (!tab) triggerFileDownload(objectUrl, filename)
+  } else {
+    triggerFileDownload(objectUrl, filename)
+  }
+
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+}
+
+export async function downloadProposalSifcReportPdf(proposalId) {
+  return downloadProposalSifcReport(proposalId, 'pdf', { attachment: true })
+}
+
+export async function downloadProposalSifcReportXlsx(proposalId) {
+  return downloadProposalSifcReport(proposalId, 'xlsx', { attachment: true })
 }
 
 export async function getProposalById(id) {

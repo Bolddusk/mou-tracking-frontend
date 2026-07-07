@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import * as mmApi from '../../api/matchmaking'
 import * as proposalsApi from '../../api/proposals'
 import Alert from '../Alert'
-import DocLink from '../DocLink'
 import FilePreviewModal from '../FilePreviewModal'
 import LoadingSpinner from '../LoadingSpinner'
 import { MM_MOU_STATUS_LABELS, MM_MOU_STATUS_ORDER } from '../../constants/matchmaking'
@@ -24,6 +23,8 @@ export default function MmMouPanel({
   matchId,
   proposalId,
   canEdit = true,
+  canUploadMou,
+  canEditMouFields,
   canMarkSigned = false,
   canCloseDeal = false,
   onStatusChange,
@@ -98,21 +99,43 @@ export default function MmMouPanel({
     setSuccess('')
     setWarning('')
     const hadFileUpload = Boolean(mouFile)
+    const uploadAllowed = resolvedCanUploadMou
+    const fieldsEditable = resolvedCanEditMouFields
+
+    if (!fieldsEditable && !hadFileUpload) {
+      setError('Select a MOU file to upload.')
+      setSaving(false)
+      return
+    }
+
     try {
-      const fields = { ...form }
-      if (markSigned) fields.mou_status = 'signed'
+      const fields = fieldsEditable ? { ...form } : {}
+      if (markSigned && fieldsEditable) fields.mou_status = 'signed'
       const res = isDirectProposal
-        ? await proposalsApi.saveProposalMou(proposalId, fields, mouFile)
-        : await mmApi.saveMatchMou(matchId, fields, mouFile)
+        ? await proposalsApi.saveProposalMou(proposalId, fields, uploadAllowed ? mouFile : null)
+        : await mmApi.saveMatchMou(matchId, fields, uploadAllowed ? mouFile : null)
 
       if (hadFileUpload && res.version != null) {
         setCurrentVersion(res.version)
       }
 
       if (hadFileUpload && res.ack_reset) {
-        setWarning(
-          res.message || 'New file uploaded — both parties must re-acknowledge',
-        )
+        const ackRequired =
+          res.acknowledgment_required !== false &&
+          ackStatus?.acknowledgment_required !== false &&
+          !ackStatus?.is_historic_mou
+
+        if (ackRequired) {
+          setWarning(
+            res.message ||
+              'A new MOU file was uploaded. Party A and Party B must open the acknowledgment section below and confirm they have reviewed the current document.',
+          )
+        } else {
+          setSuccess(
+            res.message ||
+              'MOU file uploaded successfully. Party acknowledgment is not required for this historic MOU.',
+          )
+        }
         const nextStatus = res.mou_status || 'uploaded'
         onStatusChange?.(nextStatus)
         setMouData((prev) => {
@@ -186,6 +209,17 @@ export default function MmMouPanel({
   const currentStep = stepIndex >= 0 ? stepIndex : MM_MOU_STATUS_ORDER.length - 1
   const versionEntityType = isDirectProposal ? 'proposal' : 'match'
   const versionEntityId = isDirectProposal ? proposalId : matchId
+
+  const mouCaps = mouData.capabilities || {}
+  const resolvedCanUploadMou =
+    canUploadMou ??
+    (typeof mouCaps.can_upload_mou === 'boolean' ? mouCaps.can_upload_mou : canEdit)
+  const resolvedCanEditMouFields =
+    canEditMouFields ??
+    (typeof mouCaps.can_edit_mou_fields === 'boolean' ? mouCaps.can_edit_mou_fields : canEdit)
+  const showMouEditor =
+    !isDealClosed && (resolvedCanUploadMou || resolvedCanEditMouFields)
+  const canMarkSignedNow = canMarkSigned && resolvedCanEditMouFields
 
   return (
     <div className="space-y-6">
@@ -271,31 +305,20 @@ export default function MmMouPanel({
           {mouData.mou_uploaded_at && (
             <p className="mt-3 text-xs text-slate-500">
               Last uploaded {formatDate(mouData.mou_uploaded_at)}
-              {currentVersion != null && (
-                <span className="ml-2">
-                  · Current file <MouVersionBadge version={currentVersion} />
-                </span>
-              )}
             </p>
           )}
-          {fileUrl && (
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <MouFileLink
-                fileUrl={fileUrl}
-                version={currentVersion}
-                onPreview={(url) =>
-                  setFilePreview({ url: resolveFileUrl(url), title: 'MOU Document' })
-                }
-              />
-              <button
-                type="button"
-                onClick={() => setVersionHistoryOpen(true)}
-                className="text-xs font-semibold text-portal-primary hover:underline"
-              >
-                Version history
-              </button>
-            </div>
-          )}
+          <div className="mt-4">
+            <MouDocumentStatusCard
+              fileUrl={fileUrl}
+              version={currentVersion}
+              uploadedAt={mouData.mou_uploaded_at}
+              pendingFile={mouFile}
+              onPreview={(url) =>
+                setFilePreview({ url: resolveFileUrl(url), title: 'MOU Document' })
+              }
+              onVersionHistory={() => setVersionHistoryOpen(true)}
+            />
+          </div>
         </div>
       </section>
 
@@ -321,12 +344,14 @@ export default function MmMouPanel({
         onStatusLoaded={handleAckStatusLoaded}
       />
 
-      {canEdit && !isDealClosed ? (
+      {showMouEditor ? (
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-6 py-4">
             <h3 className="text-base font-semibold text-slate-800">MOU Details</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Save text fields first, then upload the signed MOU document (PDF/DOC).
+              {resolvedCanEditMouFields
+                ? 'Save text fields first, then upload the signed MOU document (PDF/DOC).'
+                : 'Scope, sector, description, and demand are read-only. Upload the signed MOU document below.'}
             </p>
           </div>
           <div className="space-y-4 px-6 py-5">
@@ -335,13 +360,15 @@ export default function MmMouPanel({
                 label="Scope"
                 value={form.mou_scope}
                 onChange={(v) => setForm((f) => ({ ...f, mou_scope: v }))}
+                disabled={!resolvedCanEditMouFields || saving}
               />
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Sector</label>
                 <select
                   value={form.mou_sector}
                   onChange={(e) => setForm((f) => ({ ...f, mou_sector: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/30"
+                  disabled={!resolvedCanEditMouFields || saving}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/30 disabled:bg-slate-50 disabled:text-slate-500"
                 >
                   {sectors.map((s) => (
                     <option key={s} value={s}>
@@ -355,39 +382,55 @@ export default function MmMouPanel({
               label="Description"
               value={form.mou_description}
               onChange={(v) => setForm((f) => ({ ...f, mou_description: v }))}
+              disabled={!resolvedCanEditMouFields || saving}
             />
             <MouTextarea
               label="Demand"
               value={form.mou_demand}
               onChange={(v) => setForm((f) => ({ ...f, mou_demand: v }))}
+              disabled={!resolvedCanEditMouFields || saving}
             />
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                MOU File (PDF/DOC/DOCX)
-              </label>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={(e) => setMouFile(e.target.files?.[0] || null)}
-                disabled={saving}
-                className="w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium"
-              />
-              {mouFile && (
-                <p className="mt-1 text-xs text-green-700">Selected: {mouFile.name}</p>
-              )}
-              {fileUrl && !mouFile && (
-                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span>Current file on record — upload a new file to replace.</span>
-                  <MouVersionBadge version={currentVersion} />
-                </p>
-              )}
-            </div>
-            {canMarkSigned && mouStatus !== 'signed' && !isDealClosed && (
+            {resolvedCanUploadMou && (
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-800">MOU document</h4>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    PDF, DOC, or DOCX. Uploading a new file replaces the current version.
+                  </p>
+                </div>
+                <MouDocumentStatusCard
+                  fileUrl={fileUrl}
+                  version={currentVersion}
+                  uploadedAt={mouData.mou_uploaded_at}
+                  pendingFile={mouFile}
+                  compact
+                  onPreview={(url) =>
+                    setFilePreview({ url: resolveFileUrl(url), title: 'MOU Document' })
+                  }
+                  onVersionHistory={() => setVersionHistoryOpen(true)}
+                />
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    {fileUrl ? 'Replace with a new file' : 'Choose file to upload'}
+                  </label>
+                  <input
+                    type="file"
+                    name="mou_file"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    onChange={(e) => setMouFile(e.target.files?.[0] || null)}
+                    disabled={saving}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium"
+                  />
+                </div>
+              </div>
+            )}
+            {canMarkSignedNow && mouStatus !== 'signed' && !isDealClosed && (
               <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input
                   type="checkbox"
                   checked={markSigned}
                   onChange={(e) => setMarkSigned(e.target.checked)}
+                  disabled={!resolvedCanEditMouFields || saving}
                   className="rounded border-slate-300"
                 />
                 Mark MOU as signed (both parties)
@@ -396,10 +439,10 @@ export default function MmMouPanel({
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
-              className="rounded-lg bg-portal-primary text-white hover:bg-portal-primary-hover disabled:opacity-60"
+              disabled={saving || (!resolvedCanEditMouFields && !mouFile)}
+              className="rounded-lg bg-portal-primary px-4 py-2 text-sm font-semibold text-white hover:bg-portal-primary-hover disabled:opacity-60"
             >
-              {saving ? 'Saving…' : 'Save MOU'}
+              {saving ? 'Saving…' : resolvedCanEditMouFields ? 'Save MOU' : 'Upload MOU file'}
             </button>
           </div>
         </section>
@@ -414,37 +457,19 @@ export default function MmMouPanel({
             <InfoRow label="Description" value={form.mou_description} multiline />
             <InfoRow label="Demand" value={form.mou_demand} multiline />
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium text-slate-600">MOU Document</span>
-              <MouVersionBadge version={currentVersion} />
-              <DocLink
-                url={fileUrl}
-                title="MOU Document"
-                onOpen={(url) =>
+              <MouDocumentStatusCard
+                fileUrl={fileUrl}
+                version={currentVersion}
+                uploadedAt={mouData.mou_uploaded_at}
+                compact
+                onPreview={(url) =>
                   setFilePreview({ url: resolveFileUrl(url), title: 'MOU Document' })
                 }
+                onVersionHistory={() => setVersionHistoryOpen(true)}
               />
-              {fileUrl && (
-                <button
-                  type="button"
-                  onClick={() => setVersionHistoryOpen(true)}
-                  className="text-xs font-semibold text-portal-primary hover:underline"
-                >
-                  Version history
-                </button>
-              )}
             </div>
           </div>
         </section>
-      )}
-
-      {fileUrl && canEdit && !isDealClosed && (
-        <MouFileLink
-          fileUrl={fileUrl}
-          version={currentVersion}
-          onPreview={(url) =>
-            setFilePreview({ url: resolveFileUrl(url), title: 'MOU Document' })
-          }
-        />
       )}
 
       <MouVersionHistory
@@ -458,7 +483,7 @@ export default function MmMouPanel({
 
       <FilePreviewModal
         open={Boolean(filePreview)}
-        url={filePreview?.url}
+        fileUrl={filePreview?.url}
         title={filePreview?.title}
         onClose={() => setFilePreview(null)}
       />
@@ -466,26 +491,101 @@ export default function MmMouPanel({
   )
 }
 
-function MouFileLink({ fileUrl, version, onPreview }) {
-  if (!fileUrl) return null
-  return (
-    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-      <span>Current MOU file:</span>
-      <MouVersionBadge version={version} />
-      <DocLink url={fileUrl} title="MOU Document" onOpen={onPreview} />
-      <a
-        href={resolveFileUrl(fileUrl)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-xs font-medium text-portal-primary hover:underline"
+function MouDocumentStatusCard({
+  fileUrl,
+  version,
+  uploadedAt,
+  pendingFile,
+  compact = false,
+  onPreview,
+  onVersionHistory,
+}) {
+  if (pendingFile) {
+    return (
+      <div
+        className={`rounded-xl border-2 border-dashed border-green-400 bg-green-50 px-4 py-3 ${
+          compact ? '' : 'py-4'
+        }`}
       >
-        Download
-      </a>
+        <p className="text-sm font-semibold text-green-900">New file selected — save to upload</p>
+        <p className="mt-1 truncate text-sm text-green-800">{pendingFile.name}</p>
+      </div>
+    )
+  }
+
+  if (fileUrl) {
+    return (
+      <div
+        className={`rounded-xl border border-green-200 bg-green-50/80 ${
+          compact ? 'px-4 py-3' : 'px-5 py-4'
+        }`}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-sm font-semibold text-green-900">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-600 text-sm text-white">
+                ✓
+              </span>
+              MOU document on file
+            </p>
+            {uploadedAt && (
+              <p className="mt-1.5 text-xs text-slate-600">
+                Uploaded {formatDate(uploadedAt)}
+                {version != null && (
+                  <>
+                    {' '}
+                    · <MouVersionBadge version={version} />
+                  </>
+                )}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onPreview?.(fileUrl)}
+              className="rounded-lg border border-green-700/30 bg-white px-3 py-1.5 text-xs font-semibold text-green-900 hover:bg-green-50"
+            >
+              Preview
+            </button>
+            <a
+              href={resolveFileUrl(fileUrl)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Download
+            </a>
+            {onVersionHistory && (
+              <button
+                type="button"
+                onClick={onVersionHistory}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-portal-primary hover:bg-slate-50"
+              >
+                Version history
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={`rounded-xl border border-dashed border-slate-300 bg-slate-50 ${
+        compact ? 'px-4 py-3' : 'px-5 py-4'
+      }`}
+    >
+      <p className="text-sm font-medium text-slate-600">No MOU document uploaded yet</p>
+      <p className="mt-1 text-xs text-slate-500">
+        Choose a signed MOU file below to upload.
+      </p>
     </div>
   )
 }
 
-function MouField({ label, value, onChange }) {
+function MouField({ label, value, onChange, disabled = false }) {
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
@@ -493,13 +593,14 @@ function MouField({ label, value, onChange }) {
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/30"
+        disabled={disabled}
+        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/30 disabled:bg-slate-50 disabled:text-slate-500"
       />
     </div>
   )
 }
 
-function MouTextarea({ label, value, onChange }) {
+function MouTextarea({ label, value, onChange, disabled = false }) {
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
@@ -507,7 +608,8 @@ function MouTextarea({ label, value, onChange }) {
         rows={3}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/30"
+        disabled={disabled}
+        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/30 disabled:bg-slate-50 disabled:text-slate-500"
       />
     </div>
   )

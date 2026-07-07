@@ -5,6 +5,78 @@ export async function getProposalActivities(proposalId) {
   return response.data
 }
 
+function filenameFromContentDisposition(header, fallback) {
+  if (!header) return fallback
+  const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (utf8Match) return decodeURIComponent(utf8Match[1].trim())
+  const quotedMatch = /filename="([^"]+)"/i.exec(header)
+  if (quotedMatch) return quotedMatch[1]
+  const plainMatch = /filename=([^;]+)/i.exec(header)
+  if (plainMatch) return plainMatch[1].trim().replace(/"/g, '')
+  return fallback
+}
+
+function triggerFileDownload(objectUrl, filename) {
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+}
+
+export async function downloadProgressExport(proposalId, format = 'xlsx') {
+  const normalized = format === 'xls' ? 'xlsx' : format
+  const today = new Date().toISOString().slice(0, 10)
+  const fallback =
+    normalized === 'xlsx'
+      ? `mou-${proposalId}-progress-${today}.xlsx`
+      : `mou-${proposalId}-progress-${today}.csv`
+
+  const response = await client.get(`/api/proposals/${proposalId}/progress/export`, {
+    params: { format: normalized },
+    responseType: 'blob',
+  })
+
+  const filename = filenameFromContentDisposition(
+    response.headers?.['content-disposition'],
+    fallback,
+  )
+  const objectUrl = URL.createObjectURL(response.data)
+  triggerFileDownload(objectUrl, filename)
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+}
+
+export async function fetchProgressExportPreviewText(proposalId) {
+  const response = await client.get(`/api/proposals/${proposalId}/progress/export`, {
+    params: { format: 'csv' },
+    responseType: 'blob',
+  })
+  return response.data.text()
+}
+
+export async function updateActivity(activityId, data) {
+  const response = await client.patch(`/api/activities/${activityId}`, data)
+  return response.data
+}
+
+export async function deleteActivity(activityId) {
+  const response = await client.delete(`/api/activities/${activityId}`)
+  return response.data
+}
+
+export async function requestEditUnlock(activityId, note) {
+  const response = await client.post(`/api/activities/${activityId}/request-edit-unlock`, {
+    note: note || undefined,
+  })
+  return response.data
+}
+
+export async function grantEditUnlock(activityId) {
+  const response = await client.patch(`/api/activities/${activityId}/grant-edit-unlock`)
+  return response.data
+}
+
 export async function createActivity(proposalId, data) {
   const response = await client.post(`/api/proposals/${proposalId}/activities`, data)
   return response.data

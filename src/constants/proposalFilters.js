@@ -117,6 +117,8 @@ export function buildProposalListParams({
   q = '',
   date_from = '',
   date_to = '',
+  include_deleted = '',
+  archived_only = '',
   page = 1,
   limit = 20,
 } = {}) {
@@ -131,6 +133,15 @@ export function buildProposalListParams({
   if (trimmedQ) params.q = trimmedQ
   if (date_from) params.date_from = date_from
   if (date_to) params.date_to = date_to
+  if (archived_only === true || archived_only === '1' || archived_only === 'archived_only') {
+    params.archived_only = 1
+  } else if (
+    include_deleted === true ||
+    include_deleted === '1' ||
+    include_deleted === 'include_deleted'
+  ) {
+    params.include_deleted = 1
+  }
   if (page != null && page > 0) params.page = page
   if (limit != null && limit > 0) params.limit = limit
   return params

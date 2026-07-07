@@ -77,8 +77,12 @@ export default function ProposalOpportunitiesTable({
           {proposals.map((p) => {
             const title = getProposalDisplayTitle(p)
             const extraRowClass = rowClassName?.(p) || ''
+            const archived = p.is_archived === true
             return (
-              <tr key={p.id} className={`hover:bg-slate-50/80 ${extraRowClass}`}>
+              <tr
+                key={p.id}
+                className={`hover:bg-slate-50/80 ${archived ? 'bg-slate-50/60' : ''} ${extraRowClass}`}
+              >
                 {showTitle && (
                   <td className="max-w-[160px] truncate px-4 py-3 font-medium text-slate-800">
                     {title}
@@ -137,10 +141,17 @@ export default function ProposalOpportunitiesTable({
                 )}
                 {showMouLifecycle && (
                   <td className="px-4 py-3">
-                    <MouLifecycleBadge
-                      lifecycle={p.mou_lifecycle}
-                      label={p.mou_lifecycle_label}
-                    />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <MouLifecycleBadge
+                        lifecycle={p.mou_lifecycle}
+                        label={p.mou_lifecycle_label}
+                      />
+                      {archived && (
+                        <span className="inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-300">
+                          Archived
+                        </span>
+                      )}
+                    </div>
                   </td>
                 )}
                 {showWorkflowStatus && (

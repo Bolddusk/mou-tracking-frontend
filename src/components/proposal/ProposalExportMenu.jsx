@@ -2,10 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import * as proposalsApi from '../../api/proposals'
 import { getErrorMessage } from '../../utils/format'
 
-const FORMATS = [
-  { key: 'pdf', label: 'PDF', description: 'Open in browser' },
-  { key: 'xlsx', label: 'Excel', description: 'Download .xlsx' },
-  { key: 'csv', label: 'CSV', description: 'Download .csv' },
+const MOU_FORMATS = [
+  { key: 'pdf', label: 'MOU report (PDF)', description: 'Open in browser' },
+  { key: 'xlsx', label: 'MOU report (Excel)', description: 'Download .xlsx' },
+  { key: 'csv', label: 'MOU report (CSV)', description: 'Download .csv' },
+]
+
+const SIFC_FORMATS = [
+  { key: 'sifc-xlsx', label: 'SIFC report (Excel)', description: 'MOU Details + Progress history' },
+  { key: 'sifc-pdf', label: 'SIFC report (PDF)', description: 'Download PDF' },
 ]
 
 export default function ProposalExportMenu({ proposalId, onError, className = '' }) {
@@ -29,7 +34,13 @@ export default function ProposalExportMenu({ proposalId, onError, className = ''
     setOpen(false)
     setLoading(format)
     try {
-      await proposalsApi.downloadProposalExport(proposalId, format)
+      if (format === 'sifc-xlsx') {
+        await proposalsApi.downloadProposalSifcReportXlsx(proposalId)
+      } else if (format === 'sifc-pdf') {
+        await proposalsApi.downloadProposalSifcReportPdf(proposalId)
+      } else {
+        await proposalsApi.downloadProposalExport(proposalId, format)
+      }
     } catch (err) {
       onError?.(getErrorMessage(err))
     } finally {
@@ -61,8 +72,8 @@ export default function ProposalExportMenu({ proposalId, onError, className = ''
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-1.5 min-w-[11rem] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-          {FORMATS.map((f) => (
+        <div className="absolute right-0 z-30 mt-1.5 min-w-[14rem] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+          {MOU_FORMATS.map((f) => (
             <button
               key={f.key}
               type="button"
@@ -71,6 +82,19 @@ export default function ProposalExportMenu({ proposalId, onError, className = ''
               className="flex w-full flex-col items-start px-4 py-2.5 text-left hover:bg-slate-50 disabled:opacity-60"
             >
               <span className="text-sm font-semibold text-slate-800">{f.label}</span>
+              <span className="text-xs text-slate-500">{f.description}</span>
+            </button>
+          ))}
+          <div className="my-1 border-t border-slate-100" />
+          {SIFC_FORMATS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              disabled={Boolean(loading)}
+              onClick={() => handleExport(f.key)}
+              className="flex w-full flex-col items-start px-4 py-2.5 text-left hover:bg-green-50 disabled:opacity-60"
+            >
+              <span className="text-sm font-semibold text-green-900">{f.label}</span>
               <span className="text-xs text-slate-500">{f.description}</span>
             </button>
           ))}
