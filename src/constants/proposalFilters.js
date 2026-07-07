@@ -107,6 +107,14 @@ export function buildCooperationModeFilters(cooperationModes) {
 }
 
 /** Build query params for GET /api/proposals/all (omit empty values). */
+function isArchivedOnlyFilter(value) {
+  return value === true || value === 1 || value === '1' || value === 'archived_only'
+}
+
+function isIncludeDeletedFilter(value) {
+  return value === true || value === 1 || value === '1' || value === 'include_deleted'
+}
+
 export function buildProposalListParams({
   status = '',
   sector = '',
@@ -133,13 +141,9 @@ export function buildProposalListParams({
   if (trimmedQ) params.q = trimmedQ
   if (date_from) params.date_from = date_from
   if (date_to) params.date_to = date_to
-  if (archived_only === true || archived_only === '1' || archived_only === 'archived_only') {
+  if (isArchivedOnlyFilter(archived_only)) {
     params.archived_only = 1
-  } else if (
-    include_deleted === true ||
-    include_deleted === '1' ||
-    include_deleted === 'include_deleted'
-  ) {
+  } else if (isIncludeDeletedFilter(include_deleted)) {
     params.include_deleted = 1
   }
   if (page != null && page > 0) params.page = page

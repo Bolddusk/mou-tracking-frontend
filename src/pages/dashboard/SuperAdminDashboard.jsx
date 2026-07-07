@@ -484,6 +484,7 @@ export default function SuperAdminDashboard() {
             showWorkflowStatus={false}
             useConferenceDate
             showSifcCategory
+            showArchiveStatus={listScope === 'all'}
             onView={handleView}
             onOpenFile={openFile}
             renderActions={renderTableActions}

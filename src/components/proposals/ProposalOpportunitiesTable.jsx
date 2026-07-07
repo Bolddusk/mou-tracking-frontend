@@ -26,6 +26,7 @@ export default function ProposalOpportunitiesTable({
   useConferenceDate = false,
   showTitle = false,
   showSifcCategory = false,
+  showArchiveStatus = false,
 }) {
   if (loading) {
     return (
@@ -62,6 +63,9 @@ export default function ProposalOpportunitiesTable({
             )}
             {showMouLifecycle && (
               <th className="px-4 py-3 font-semibold">MOU Status</th>
+            )}
+            {showArchiveStatus && (
+              <th className="px-4 py-3 font-semibold">Archive</th>
             )}
             {showWorkflowStatus && (
               <th className="px-4 py-3 font-semibold">Status</th>
@@ -141,17 +145,21 @@ export default function ProposalOpportunitiesTable({
                 )}
                 {showMouLifecycle && (
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <MouLifecycleBadge
-                        lifecycle={p.mou_lifecycle}
-                        label={p.mou_lifecycle_label}
-                      />
-                      {archived && (
-                        <span className="inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-300">
-                          Archived
-                        </span>
-                      )}
-                    </div>
+                    <MouLifecycleBadge
+                      lifecycle={p.mou_lifecycle}
+                      label={p.mou_lifecycle_label}
+                    />
+                  </td>
+                )}
+                {showArchiveStatus && (
+                  <td className="px-4 py-3">
+                    {archived ? (
+                      <span className="inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-300">
+                        Archived
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
                   </td>
                 )}
                 {showWorkflowStatus && (

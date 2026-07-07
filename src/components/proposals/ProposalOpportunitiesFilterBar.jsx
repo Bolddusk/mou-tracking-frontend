@@ -159,11 +159,16 @@ export default function ProposalOpportunitiesFilterBar({
         <FilterDate label="To date" value={dateTo} onChange={onDateToChange} />
 
         {showArchiveFilter && (
-          <FilterSelect label="Archive" value={archiveFilter} onChange={onArchiveFilterChange}>
-            <option value="">Active only</option>
-            <option value="include_deleted">Include archived</option>
-            <option value="archived_only">Archived only</option>
-          </FilterSelect>
+          <div className="flex min-w-0 flex-col gap-1">
+            <FilterSelect label="Archive" value={archiveFilter} onChange={onArchiveFilterChange}>
+              <option value="">Active only</option>
+              <option value="include_deleted">Include archived</option>
+              <option value="archived_only">Archived only</option>
+            </FilterSelect>
+            <p className="text-[10px] leading-snug text-slate-500">
+              Separate from MOU Status (Active/Inactive). Archived rows use the Archive column.
+            </p>
+          </div>
         )}
       </div>
 
