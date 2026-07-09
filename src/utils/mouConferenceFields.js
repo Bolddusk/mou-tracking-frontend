@@ -107,7 +107,7 @@ export function getMouConferenceRow(proposal) {
   return {
     chineseCompany: getChineseCompany(proposal),
     pakistaniCompany: getPakistaniCompany(proposal),
-    sifcCategory: displayOrDash(es.sifc_category),
+    sifcCategory: getProposalSifcCategory(proposal),
     cooperationMode: getCooperationModeLabel(proposal),
     mouValue: formatMouValueUsd(proposal?.investment_value_usd),
     outcome: displayOrDash(outcome),
@@ -123,6 +123,9 @@ export function getMouConferenceRow(proposal) {
 
 export function shouldShowConferenceMouDetails(proposal, conferences = []) {
   if (!proposal) return false
+  // Same MOU Details grid for imported and direct (11-step) proposals
+  if (proposal.status && proposal.status !== 'draft') return true
+
   if (proposal.is_historic_mou || proposal.show_mou_detail_columns) return true
 
   const conf = findConferenceByKey(conferences, proposal.conference_key)
@@ -136,6 +139,75 @@ export function shouldShowConferenceMouDetails(proposal, conferences = []) {
     row.bottlenecks !== '—' ||
     proposal?.investment_value_usd != null
   )
+}
+
+export function isWizardProposal(proposal) {
+  if (!proposal) return false
+  return Boolean(
+    proposal.company_overview?.years_in_operation ||
+      proposal.financials?.years?.length ||
+      proposal.investment_ask?.total_project_cost_usd,
+  )
+}
+
+function hasText(value) {
+  return value != null && String(value).trim() !== ''
+}
+
+export function proposalSectionHasData(proposal, section) {
+  if (!proposal) return false
+  switch (section) {
+    case 'engagement':
+      return Boolean(
+        proposal.engagement_type ||
+          proposal.conference_name ||
+          Object.values(proposal.conference_info || {}).some(hasText),
+      )
+    case 'parties':
+      return Boolean(
+        Object.values(proposal.party_a_info || {}).some(hasText) ||
+          proposal.party_b_name ||
+          proposal.party_b_email ||
+          proposal.party_b_organization,
+      )
+    case 'identity':
+      return Boolean(
+        proposal.company_name ||
+          proposal.venture_name ||
+          proposal.sector ||
+          proposal.project_type ||
+          proposal.party_a_name,
+      )
+    case 'mouCard':
+      return Boolean(
+        proposal.mou_sector || proposal.mou_scope || proposal.mou_demand || proposal.sector_lead_comment,
+      )
+    case 'executive':
+      return Object.values(proposal.executive_summary || {}).some(hasText)
+    case 'company':
+      return Object.values(proposal.company_overview || {}).some(hasText)
+    case 'project':
+      return Boolean(
+        Object.values(proposal.project_overview || {}).some(hasText) || proposal.venture_name,
+      )
+    case 'financials':
+      return Boolean(proposal.financials?.years?.length)
+    case 'investment':
+      return Object.values(proposal.investment_ask || {}).some(hasText)
+    case 'contact':
+      return Object.values(proposal.contact_info || {}).some(hasText)
+    case 'files':
+      return Boolean(
+        proposal.company_logo_url ||
+          proposal.cover_image_url ||
+          proposal.proposal_file_url ||
+          proposal.mou_file_url,
+      )
+    case 'mouDescription':
+      return hasText(proposal.mou_description)
+    default:
+      return false
+  }
 }
 
 export function getOpportunitiesDashboardHeader({

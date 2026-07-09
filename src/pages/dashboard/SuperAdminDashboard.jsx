@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import * as proposalsApi from '../../api/proposals'
+import * as activitiesApi from '../../api/activities'
 import Alert from '../../components/Alert'
 import {
   ActionGroup,
@@ -53,7 +54,7 @@ const EMPTY_ADVANCED_FILTERS = {
 export default function SuperAdminDashboard() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { rbac } = useAuth()
+  const { rbac, isSuperAdmin } = useAuth()
   const listScope = useMemo(() => getProposalsListScope(rbac), [rbac])
   const pageTitle = useMemo(() => getOpportunitiesNavLabel(rbac), [rbac])
   const [statusFilter, setStatusFilter] = useState('')
@@ -81,6 +82,7 @@ export default function SuperAdminDashboard() {
   const [partyBCredentialsSubtitle, setPartyBCredentialsSubtitle] = useState('')
   const [dashboardView, setDashboardView] = useState('opportunities')
   const [archiveFilter, setArchiveFilter] = useState('')
+  const [dismissAllLoading, setDismissAllLoading] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchInput), 300)
@@ -271,6 +273,31 @@ export default function SuperAdminDashboard() {
 
   const handleView = (id) => navigate(`/proposals/${id}`)
 
+  const handleDismissAllPendingUpdates = async () => {
+    if (
+      !window.confirm(
+        'Clear all pending update requests waiting for Party A? This does not affect submissions already awaiting review.',
+      )
+    ) {
+      return
+    }
+    setDismissAllLoading(true)
+    setError('')
+    try {
+      const res = await activitiesApi.dismissAllPendingUpdateRequests()
+      setSuccess(
+        res?.message ||
+          `Cleared ${res?.dismissed_count ?? 0} pending update request(s)`,
+      )
+      await load()
+      await loadStats()
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setDismissAllLoading(false)
+    }
+  }
+
   const handleEditMous = async (proposal) => {
     setError('')
     try {
@@ -434,6 +461,22 @@ export default function SuperAdminDashboard() {
           statusValue={statusFilter}
           onStatusChange={setStatusFilter}
         />
+
+        {listScope === 'all' && isSuperAdmin && dashboardView === 'opportunities' && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-100 bg-amber-50/40 px-4 py-2 sm:px-6">
+            <p className="text-xs text-amber-900">
+              Temporary cleanup — clears pending Party A requests only (not ready for review).
+            </p>
+            <button
+              type="button"
+              onClick={handleDismissAllPendingUpdates}
+              disabled={dismissAllLoading}
+              className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+            >
+              {dismissAllLoading ? 'Clearing…' : 'Clear all pending update requests'}
+            </button>
+          </div>
+        )}
 
         <ProposalOpportunitiesFilterBar
           conferenceKey={conferenceFilter}

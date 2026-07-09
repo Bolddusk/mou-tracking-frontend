@@ -14,6 +14,8 @@ import ProposalMouFieldsEditor from '../../components/proposal/ProposalMouFields
 import ProposalPartyContactsEditor from '../../components/proposal/ProposalPartyContactsEditor'
 import ProposalProgressPanel from '../../components/proposal/ProposalProgressPanel'
 import ProposalProgressEditModal from '../../components/proposal/ProposalProgressEditModal'
+import ProposalUpdateRequestsPanel from '../../components/proposal/ProposalUpdateRequestsPanel'
+import ProposalUpdateResponseEditModal from '../../components/proposal/ProposalUpdateResponseEditModal'
 import ProposalExportMenu from '../../components/proposal/ProposalExportMenu'
 import ProposalExportReportModal from '../../components/proposal/ProposalExportReportModal'
 import ProposalSifcReportPreviewModal from '../../components/proposal/ProposalSifcReportPreviewModal'
@@ -116,6 +118,9 @@ export default function ProposalDetail() {
   const [archiveModalOpen, setArchiveModalOpen] = useState(false)
   const [archiveReason, setArchiveReason] = useState('')
   const [restoreModalOpen, setRestoreModalOpen] = useState(false)
+  const [updateResponseEditOpen, setUpdateResponseEditOpen] = useState(false)
+  const [promoteTargetId, setPromoteTargetId] = useState(null)
+  const [promoteComment, setPromoteComment] = useState('')
   const [changeLogRefreshKey, setChangeLogRefreshKey] = useState(0)
   const [credentialModal, setCredentialModal] = useState(null)
   const credentialQueueRef = useRef([])
@@ -123,7 +128,6 @@ export default function ProposalDetail() {
   const canReview = isSectorLead || isSuperAdmin
   const isAdminRole = isSuperAdmin || user?.role === ROLES.ADMIN
   const canExportReport = canReview || isAdminRole
-  const canPoke = canReview
 
   const isRfpEngagement = useMemo(() => {
     return Boolean(
@@ -345,6 +349,7 @@ export default function ProposalDetail() {
     const tab = searchParams.get('tab')
     if (tab === 'chat' && canChat) return 'chat'
     if (tab === 'mou' && canMou) return 'mou'
+    if (tab === 'updates') return 'updates'
     if (tab === 'progress' || tab === 'activities') return 'progress'
     if (tab === 'history') return 'history'
     if (tab === 'companies' && canViewCompanies) return 'companies'
@@ -356,6 +361,8 @@ export default function ProposalDetail() {
       setSearchParams({ tab: 'chat' }, { replace: true })
     } else if (tab === 'mou' && canMou) {
       setSearchParams({ tab: 'mou' }, { replace: true })
+    } else if (tab === 'updates') {
+      setSearchParams({ tab: 'updates' }, { replace: true })
     } else if (tab === 'progress') {
       setSearchParams({ tab: 'progress' }, { replace: true })
     } else if (tab === 'history') {
@@ -465,6 +472,7 @@ export default function ProposalDetail() {
       proposal?.poke_status?.status === 'pending_response' &&
       isPartyA
     ) {
+      setSearchParams({ tab: 'updates' }, { replace: true })
       setRespondMode(true)
       setRespondPokeActivityId(
         location.state?.pokeActivityId || proposal.poke_status?.poke_activity_id || null
@@ -472,7 +480,7 @@ export default function ProposalDetail() {
       setShowAddActivity(true)
       window.history.replaceState({}, '')
     }
-  }, [location.state, proposal, isPartyA])
+  }, [location.state, proposal, isPartyA, setSearchParams])
 
   const openActivityModal = (pokeResponse = false, pokeActivityId = null) => {
     setRespondMode(pokeResponse)
@@ -552,14 +560,71 @@ export default function ProposalDetail() {
     }
   }, [loading, proposal, canExportReport, searchParams, setSearchParams])
 
-  const handlePoke = async () => {
+  const handleRequestUpdate = async () => {
     setActionLoading(true)
     setError('')
     setSuccess('')
     try {
-      await activitiesApi.pokeForUpdate(id)
-      setSuccess('Update requested — Party A has been notified')
-      await load()
+      const res = await activitiesApi.pokeForUpdate(id)
+      await refetchProposal()
+      setSuccess(res?.message || 'Update requested — Party A has been notified')
+      setTab('updates')
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleDismissUpdateRequest = async (activityId) => {
+    if (!activityId) return
+    setActionLoading(true)
+    setError('')
+    try {
+      await activitiesApi.dismissUpdateRequest(activityId)
+      setSuccess('Update request dismissed')
+      await refetchProposal()
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleEditUpdateResponseSave = async (form) => {
+    const activityId = proposal?.poke_status?.poke_activity_id
+    if (!activityId) return
+    setActionLoading(true)
+    setError('')
+    try {
+      await activitiesApi.patchPokeResponse(activityId, {
+        activity_date: form.activity_date,
+        title: form.title.trim(),
+        description: form.description.trim(),
+        support_file_url: form.support_file_url || undefined,
+      })
+      setUpdateResponseEditOpen(false)
+      setSuccess('Party A update saved')
+      await refetchProposal()
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handlePromoteToProgress = async () => {
+    if (!promoteTargetId) return
+    setActionLoading(true)
+    setError('')
+    try {
+      const res = await activitiesApi.promoteUpdateToProgress(promoteTargetId, promoteComment)
+      setPromoteTargetId(null)
+      setPromoteComment('')
+      setSuccess(res?.message || 'Party A update moved to Progress')
+      await refreshProgressAndProposal()
+      bumpChangeLogs()
+      setTab('progress')
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -596,10 +661,15 @@ export default function ProposalDetail() {
       closeActivityModal()
       setSuccess(
         isPokeResponse
-          ? 'Update response saved — status marked as Answered'
+          ? 'Update response saved — waiting for Sector Lead review'
           : 'Progress update recorded — MOU Details updated',
       )
-      await refreshProgressAndProposal()
+      if (isPokeResponse) {
+        await refetchProposal()
+        setTab('updates')
+      } else {
+        await refreshProgressAndProposal()
+      }
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -744,7 +814,16 @@ export default function ProposalDetail() {
     !isDealClosed &&
     !isArchived &&
     proposal.capabilities?.can_add_activity !== false
-  const canPokeActions = canPoke && canWriteProgress
+  const canViewUpdates =
+    canTrackProgress &&
+    !isRfpEngagement &&
+    !isDealClosed &&
+    !isArchived &&
+    (isPartyA || canReview || isAdminRole)
+  const updateRequestStatus =
+    proposal?.poke_status?.status || proposal?.capabilities?.update_request_status || 'none'
+  const hasActiveUpdateRequest =
+    updateRequestStatus && updateRequestStatus !== 'none'
   const backPath = isRfpEngagement ? '/matchmaking/matches' : dashboardPath
   const backLabel = isRfpEngagement ? 'Matches' : 'Dashboard'
 
@@ -787,16 +866,6 @@ export default function ProposalDetail() {
                 Preview Report
               </button>
             </>
-          )}
-          {canPokeActions && (
-            <button
-              type="button"
-              onClick={handlePoke}
-              disabled={actionLoading}
-              className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 shadow-sm hover:bg-amber-100 disabled:opacity-60"
-            >
-              🔔 Request for Update
-            </button>
           )}
           {canWriteProgress && (
             <button
@@ -884,31 +953,6 @@ export default function ProposalDetail() {
               className="mt-3 inline-flex rounded-lg bg-portal-primary px-4 py-2 text-xs font-semibold text-white hover:bg-portal-primary-hover"
             >
               Edit & Resubmit
-            </button>
-          )}
-        </div>
-      )}
-
-      {proposal.poke_status?.status === 'pending_response' &&
-        !isDealClosed &&
-        (isPartyA || canReview) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <div>
-            <strong>Update requested:</strong>{' '}
-            {formatUpdateRequestLabel(proposal.poke_status.label)}
-            {isPartyA && (
-              <p className="mt-1 text-xs">
-                Add what you completed (use the actual work date), attach proof document, and optional comment.
-              </p>
-            )}
-          </div>
-          {isPartyA && (
-            <button
-              type="button"
-              onClick={() => openActivityModal(true, pendingPokeActivityId)}
-              className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-700"
-            >
-              Respond to Update Request
             </button>
           )}
         </div>
@@ -1006,6 +1050,21 @@ export default function ProposalDetail() {
         {canViewCompanies && (
           <DetailTabButton active={activeTab === 'companies'} onClick={() => setTab('companies')}>
             Companies
+          </DetailTabButton>
+        )}
+        {canViewUpdates && (
+          <DetailTabButton active={activeTab === 'updates'} onClick={() => setTab('updates')}>
+            <span className="inline-flex items-center gap-1.5">
+              Updates
+              {hasActiveUpdateRequest && (
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    updateRequestStatus === 'awaiting_review' ? 'bg-blue-500' : 'bg-amber-500'
+                  }`}
+                  aria-hidden
+                />
+              )}
+            </span>
           </DetailTabButton>
         )}
         {canTrackProgress && (
@@ -1107,6 +1166,23 @@ export default function ProposalDetail() {
           currentUserId={user?.id}
           enabled={activeTab === 'chat' && canChat}
         />
+      ) : activeTab === 'updates' ? (
+        <ProposalUpdateRequestsPanel
+          proposal={proposal}
+          actionLoading={actionLoading}
+          showStaffRequestHint={canReview || isAdminRole}
+          onRequestUpdate={handleRequestUpdate}
+          onRespond={() =>
+            openActivityModal(
+              true,
+              proposal.poke_status?.poke_activity_id || pendingPokeActivityId,
+            )
+          }
+          onEditResponse={() => setUpdateResponseEditOpen(true)}
+          onPromote={(activityId) => setPromoteTargetId(activityId)}
+          onDismiss={handleDismissUpdateRequest}
+          onOpenFile={(url, title) => setFilePreview({ url, title })}
+        />
       ) : activeTab === 'progress' ? (
         <ProposalProgressPanel
           proposalId={canTrackProgress ? proposal.id : undefined}
@@ -1153,6 +1229,7 @@ export default function ProposalDetail() {
         loading={actionLoading || activityUploading}
         confirmDisabled={
           !activityForm.title.trim() ||
+          !activityForm.description.trim() ||
           activityUploading ||
           (respondMode && !respondPokeActivityId)
         }
@@ -1277,6 +1354,37 @@ export default function ProposalDetail() {
         onClose={() => setFieldsEditorOpen(false)}
         onSaved={handleFieldsSaved}
       />
+
+      <ProposalUpdateResponseEditModal
+        open={updateResponseEditOpen}
+        initial={proposal?.poke_status?.party_a_response}
+        loading={actionLoading}
+        onClose={() => setUpdateResponseEditOpen(false)}
+        onSave={handleEditUpdateResponseSave}
+      />
+
+      <Modal
+        open={Boolean(promoteTargetId)}
+        title="Add to Progress"
+        onClose={() => {
+          setPromoteTargetId(null)
+          setPromoteComment('')
+        }}
+        onConfirm={handlePromoteToProgress}
+        confirmLabel="Add to Progress"
+        loading={actionLoading}
+      >
+        <p className="mb-3 text-sm text-slate-600">
+          Move Party A&apos;s update to the Progress tab and update MOU Details → Progress.
+        </p>
+        <textarea
+          rows={2}
+          value={promoteComment}
+          onChange={(e) => setPromoteComment(e.target.value)}
+          placeholder="Optional note for the record…"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+        />
+      </Modal>
 
       <ProposalProgressEditModal
         open={Boolean(progressEditTarget)}

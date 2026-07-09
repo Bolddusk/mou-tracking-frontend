@@ -250,7 +250,7 @@ export default function PartyADashboard() {
                 <button
                   type="button"
                   onClick={() =>
-                    navigate(`/proposals/${p.id}`, {
+                    navigate(`/proposals/${p.id}?tab=updates`, {
                       state: {
                         respondToPoke: true,
                         pokeActivityId: p.poke_status?.poke_activity_id,

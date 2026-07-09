@@ -112,7 +112,11 @@ export function formatUsd(amount) {
 }
 
 export function getErrorMessage(err) {
-  return err?.response?.data?.error || err?.message || 'Something went wrong'
+  const data = err?.response?.data
+  if (data?.code === 'party_a_email_missing' && data?.error) {
+    return data.error
+  }
+  return data?.error || err?.message || 'Something went wrong'
 }
 
 /** Pakistan matchmaking create APIs are party_a only. */

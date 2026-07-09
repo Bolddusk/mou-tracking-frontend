@@ -28,6 +28,23 @@ function hasValue(v) {
   return v !== null && v !== undefined && String(v).trim() !== ''
 }
 
+/** Suggested executive-summary narrative when the user has not written custom alignment. */
+export function defaultSectorAlignmentText(sector, conferenceName) {
+  const sectorLabel = String(sector || '').trim()
+  if (!sectorLabel) return ''
+  const conf = String(conferenceName || '').trim()
+  if (conf) {
+    return `Directly supports ${sectorLabel} sector priorities under ${conf} — import substitution and technology transfer.`
+  }
+  return `Directly supports ${sectorLabel} sector priorities under Pak-China Agri-Investment Conference — import substitution and technology transfer.`
+}
+
+export function isAutoSectorAlignment(alignment, sector, conferenceName) {
+  const text = String(alignment || '').trim()
+  if (!text) return true
+  return text === defaultSectorAlignmentText(sector, conferenceName)
+}
+
 function completedStepsKey(proposalId) {
   return proposalId ? String(proposalId) : '_session'
 }
@@ -161,7 +178,7 @@ export function detectStepFromForm(form) {
 }
 
 export function loadDraftFromProposal(proposal) {
-  const form = mergeNested(EMPTY_PROPOSAL_FORM, proposal)
+  const form = hydrateDraftFormFromProposal(proposal)
   const step = detectStepFromForm(form)
   const completedSteps = loadCompletedSteps(proposal.id)
   persistFormState(form, step, proposal.id)
@@ -172,5 +189,43 @@ export function loadDraftFromProposal(proposal) {
 export function proposalToFormPayload(form, proposalId) {
   const payload = { ...form }
   if (proposalId) payload.proposal_id = proposalId
+  payload.cooperation_mode = form.cooperation_mode || 'mou'
+  if (form.conference_key) payload.conference_key = form.conference_key
+  const conferenceName = form.conference_info?.conference_name || ''
+  const exec = { ...(form.executive_summary || {}) }
+  if (!hasValue(exec.sector_alignment) && hasValue(form.sector)) {
+    exec.sector_alignment = defaultSectorAlignmentText(form.sector, conferenceName)
+  }
+  if (hasValue(form.sector)) {
+    payload.mou_sector = String(form.sector).trim()
+  }
+  if (hasValue(form.investment_ask?.total_project_cost_usd)) {
+    payload.mou_demand = `USD ${String(form.investment_ask.total_project_cost_usd).trim()} million`
+  }
+  if (form.sifc_category) {
+    payload.sifc_category = form.sifc_category
+    exec.sifc_category = form.sifc_category
+  }
+  payload.executive_summary = exec
   return payload
+}
+
+export function hydrateDraftFormFromProposal(proposal) {
+  const form = mergeNested(EMPTY_PROPOSAL_FORM, proposal)
+  const sifc =
+    proposal?.sifc_category ||
+    proposal?.executive_summary?.sifc_category ||
+    form.sifc_category ||
+    ''
+  form.sifc_category = sifc
+  if (sifc && form.executive_summary) {
+    form.executive_summary.sifc_category = sifc
+  }
+  if (proposal?.conference_key) {
+    form.conference_key = proposal.conference_key
+  }
+  if (!form.cooperation_mode) {
+    form.cooperation_mode = proposal?.cooperation_mode || 'mou'
+  }
+  return form
 }

@@ -156,9 +156,12 @@ export const EMPTY_PROPOSAL_FORM = {
   party_b_country: '',
   mou_scope: '',
   mou_description: '',
-  mou_sector: SECTORS[0],
+  mou_sector: '',
   mou_demand: '',
   mou_file_url: '',
+  conference_key: '',
+  sifc_category: '',
+  cooperation_mode: 'mou',
 }
 
 export function getEngagementLabel(value) {

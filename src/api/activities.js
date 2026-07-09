@@ -101,6 +101,28 @@ export async function respondToPoke(activityId, data) {
   return response.data
 }
 
+export async function patchPokeResponse(activityId, data) {
+  const response = await client.patch(`/api/activities/${activityId}/poke-response`, data)
+  return response.data
+}
+
+export async function promoteUpdateToProgress(activityId, comment) {
+  const response = await client.post(`/api/activities/${activityId}/promote-to-progress`, {
+    comment: comment?.trim() || undefined,
+  })
+  return response.data
+}
+
+export async function dismissUpdateRequest(activityId) {
+  const response = await client.post(`/api/activities/${activityId}/dismiss-update-request`)
+  return response.data
+}
+
+export async function dismissAllPendingUpdateRequests() {
+  const response = await client.post('/api/admin/update-requests/dismiss-all-pending')
+  return response.data
+}
+
 export async function approveActivity(activityId, comment) {
   const response = await client.patch(`/api/activities/${activityId}/approve`, {
     comment: comment || undefined,

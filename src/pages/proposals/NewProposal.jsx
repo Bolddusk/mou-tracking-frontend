@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import * as mmApi from '../../api/matchmaking'
 import * as proposalsApi from '../../api/proposals'
+import * as conferencesApi from '../../api/conferences'
+import * as sifcApi from '../../api/sifcCategories'
 import Alert from '../../components/Alert'
 import FinancialsEditor from '../../components/proposal/FinancialsEditor'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -26,7 +28,7 @@ import {
 } from '../../constants/matchmaking'
 import { useAuth } from '../../context/AuthContext'
 import { useSectors } from '../../context/SectorsContext'
-import { getErrorMessage } from '../../utils/format'
+import { getErrorMessage, toDateInputValue } from '../../utils/format'
 import * as mmDraft from '../../utils/mmProposalDraft'
 import { EMPTY_MM_PROPOSAL_FORM } from '../../utils/mmProposalDraft'
 import * as draft from '../../utils/proposalDraft'
@@ -89,6 +91,9 @@ export default function NewProposal({ variant = 'legacy' }) {
   const [showOwnerPicker, setShowOwnerPicker] = useState(
     isMm && isSuperAdmin && !initial.proposalId && !editProposalId && !mmDraft.loadOnBehalfId(),
   )
+  const [conferences, setConferences] = useState([])
+  const [sifcCategories, setSifcCategories] = useState([])
+  const [alignmentExpanded, setAlignmentExpanded] = useState(false)
 
   const isSideB = isMm && form.side === 'side_b'
   const contentStep = isMm ? mmContentStep(step) : step
@@ -118,9 +123,50 @@ export default function NewProposal({ variant = 'legacy' }) {
   }, [isMm, completedSteps, proposalId])
 
   useEffect(() => {
+    if (isMm) return
+    let cancelled = false
+    Promise.all([conferencesApi.getConferences(), sifcApi.getSifcCategories()])
+      .then(([confRes, sifcRes]) => {
+        if (cancelled) return
+        const confList = Array.isArray(confRes) ? confRes : confRes?.conferences || []
+        const sifcList = Array.isArray(sifcRes)
+          ? sifcRes
+          : sifcRes?.categories || sifcRes?.data || []
+        setConferences(confList.filter((c) => c.is_active !== false))
+        setSifcCategories(sifcList.filter((c) => c.is_active !== false))
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setConferences([])
+          setSifcCategories([])
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isMm])
+
+  useEffect(() => {
     if (!isMm || isSuperAdmin || !user?.role) return
     setForm((f) => ({ ...f, side: defaultSideForRole(user.role) }))
   }, [isMm, user?.role, isSuperAdmin])
+
+  useEffect(() => {
+    if (contentStep !== 5) return
+    setForm((f) => {
+      if (!f.sector?.trim()) return f
+      const conferenceName = f.conference_info?.conference_name || ''
+      const align = f.executive_summary?.sector_alignment?.trim()
+      if (align) return f
+      return {
+        ...f,
+        executive_summary: {
+          ...f.executive_summary,
+          sector_alignment: draft.defaultSectorAlignmentText(f.sector, conferenceName),
+        },
+      }
+    })
+  }, [contentStep])
 
   useEffect(() => {
     if (!isMm || !editProposalId) return
@@ -266,6 +312,83 @@ export default function NewProposal({ variant = 'legacy' }) {
     })
   }
 
+  const applyConferenceSelection = (e) => {
+    const key = e.target.value
+    if (!key) {
+      setForm((f) => ({ ...f, conference_key: '' }))
+      return
+    }
+    const conf = conferences.find((c) => (c.key || c.conference_key) === key)
+    setForm((f) => {
+      if (!conf) return { ...f, conference_key: key }
+      const engagement = conf.engagement_type ? String(conf.engagement_type).toUpperCase() : ''
+      const prevConferenceName = f.conference_info?.conference_name || ''
+      const conferenceName = conf.name || f.conference_info.conference_name
+      const next = {
+        ...f,
+        conference_key: key,
+        engagement_type: f.engagement_type || engagement,
+        conference_info: {
+          ...f.conference_info,
+          conference_name: conferenceName,
+          conference_date:
+            toDateInputValue(conf.conference_date) || f.conference_info.conference_date,
+          conference_end_date:
+            toDateInputValue(conf.conference_end_date) || f.conference_info.conference_end_date,
+          conference_location: conf.location || f.conference_info.conference_location,
+          conference_host: conf.host || f.conference_info.conference_host,
+          conference_description: conf.description || f.conference_info.conference_description,
+        },
+      }
+      if (
+        f.sector &&
+        draft.isAutoSectorAlignment(
+          f.executive_summary?.sector_alignment,
+          f.sector,
+          prevConferenceName,
+        )
+      ) {
+        next.executive_summary = {
+          ...f.executive_summary,
+          sector_alignment: draft.defaultSectorAlignmentText(f.sector, conferenceName),
+        }
+      }
+      return next
+    })
+  }
+
+  const applySectorSelection = (e) => {
+    const sector = e.target.value
+    setForm((f) => {
+      const conferenceName = f.conference_info?.conference_name || ''
+      const shouldAutoFill = draft.isAutoSectorAlignment(
+        f.executive_summary?.sector_alignment,
+        f.sector,
+        conferenceName,
+      )
+      return {
+        ...f,
+        sector,
+        mou_sector: sector,
+        executive_summary: {
+          ...f.executive_summary,
+          sector_alignment: shouldAutoFill
+            ? draft.defaultSectorAlignmentText(sector, conferenceName)
+            : f.executive_summary.sector_alignment,
+        },
+      }
+    })
+  }
+
+  const applySifcCategory = (e) => {
+    const value = e.target.value
+    setForm((f) => ({
+      ...f,
+      sifc_category: value,
+      executive_summary: { ...f.executive_summary, sifc_category: value },
+    }))
+  }
+
   const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   const setNested = (section, key) => (e) =>
@@ -294,7 +417,14 @@ export default function NewProposal({ variant = 'legacy' }) {
     const result = await proposalsApi.saveDraft(payload)
     const id = result.proposal_id
     setProposalId(id)
-    draft.persistFormState(form, step, id)
+    try {
+      const prop = await proposalsApi.getProposalById(id)
+      const hydrated = draft.hydrateDraftFormFromProposal(prop)
+      setForm(hydrated)
+      draft.persistFormState(hydrated, step, id)
+    } catch {
+      draft.persistFormState(form, step, id)
+    }
     return id
   }
 
@@ -674,7 +804,7 @@ export default function NewProposal({ variant = 'legacy' }) {
                 <Select
                   label="Sector"
                   value={form.sector}
-                  onChange={setField('sector')}
+                  onChange={applySectorSelection}
                   options={sectors}
                 />
               </div>
@@ -687,6 +817,44 @@ export default function NewProposal({ variant = 'legacy' }) {
             {form.engagement_type ? (
               <div className="space-y-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4 sm:p-5">
                 <p className="text-sm font-medium text-slate-700">Conference details</p>
+                {!isMm && (
+                  <div>
+                    <label
+                      htmlFor="conference-picker"
+                      className="mb-1 block text-sm font-medium text-slate-700"
+                    >
+                      Conference
+                    </label>
+                    <select
+                      id="conference-picker"
+                      value={form.conference_key}
+                      onChange={applyConferenceSelection}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
+                    >
+                      <option value="">Select conference…</option>
+                      {form.conference_key &&
+                        !conferences.some(
+                          (c) => (c.key || c.conference_key) === form.conference_key,
+                        ) && (
+                          <option value={form.conference_key}>
+                            {form.conference_info.conference_name || form.conference_key} (current)
+                          </option>
+                        )}
+                      {conferences.map((c) => {
+                        const key = c.key || c.conference_key
+                        return (
+                          <option key={key || c.id} value={key}>
+                            {c.name}
+                          </option>
+                        )
+                      })}
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Picking a conference fills the fields below and sends <code>conference_key</code>{' '}
+                      on draft save.
+                    </p>
+                  </div>
+                )}
                 <Field
                   label="Conference Name"
                   value={form.conference_info.conference_name}
@@ -882,14 +1050,106 @@ export default function NewProposal({ variant = 'legacy' }) {
             <SectionTitle step={step} totalSteps={maxStep} title="Executive Summary" />
             {!isMm && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Select label="Key Sector" value={form.sector} onChange={setField('sector')} options={sectors} />
+              <Select label="Key Sector" value={form.sector} onChange={applySectorSelection} options={sectors} />
               <Select label="Project Type" value={form.project_type} onChange={setField('project_type')} options={PROJECT_TYPES} />
             </div>
+            )}
+            {!isMm && (
+              <p className="text-sm text-slate-600">
+                <strong>Key Sector</strong> routes your proposal to the right Sector Lead. The alignment
+                note below is a short executive-summary narrative — not the same field as sector.
+              </p>
+            )}
+            {!isMm && (
+              <div>
+                <label htmlFor="sifc-category" className="mb-1 block text-sm font-medium text-slate-700">
+                  SIFC Category
+                </label>
+                <select
+                  id="sifc-category"
+                  value={form.sifc_category}
+                  onChange={applySifcCategory}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
+                >
+                  <option value="">Select SIFC category…</option>
+                  {form.sifc_category &&
+                    !sifcCategories.some((c) => c.name === form.sifc_category) && (
+                      <option value={form.sifc_category}>{form.sifc_category} (current)</option>
+                    )}
+                  {sifcCategories.map((cat) => (
+                    <option key={cat.id || cat.name} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
             <Textarea label="Brief Company Overview" value={form.executive_summary.company_overview} onChange={setNested('executive_summary', 'company_overview')} required />
             <Textarea label="Brief Project Overview" value={form.executive_summary.project_overview} onChange={setNested('executive_summary', 'project_overview')} required />
             <Field label="Project Segment" value={form.executive_summary.project_segment} onChange={setNested('executive_summary', 'project_segment')} required />
-            <Textarea label="Alignment with Pak-China Agri-Investment Key Sectors" value={form.executive_summary.sector_alignment} onChange={setNested('executive_summary', 'sector_alignment')} required />
+            {(() => {
+              const conferenceName = form.conference_info?.conference_name || ''
+              const suggestedAlignment = draft.defaultSectorAlignmentText(form.sector, conferenceName)
+              const alignmentText = form.executive_summary.sector_alignment?.trim() || ''
+              const alignmentCustomized =
+                Boolean(alignmentText) &&
+                !draft.isAutoSectorAlignment(alignmentText, form.sector, conferenceName)
+              const showAlignmentEditor = alignmentExpanded || alignmentCustomized
+
+              if (!showAlignmentEditor) {
+                return (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-sm font-medium text-slate-700">
+                      Conference priority alignment
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {alignmentText ||
+                        suggestedAlignment ||
+                        'Select a Key Sector to generate a suggested alignment narrative.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setAlignmentExpanded(true)}
+                      className="mt-2 text-sm font-medium text-portal-primary hover:underline"
+                    >
+                      Customize alignment narrative
+                    </button>
+                  </div>
+                )
+              }
+
+              return (
+                <div className="space-y-2">
+                  <Textarea
+                    label="How does this project align with conference priorities?"
+                    hint="Optional narrative for the executive summary. Key Sector is the category; this explains policy / conference fit."
+                    value={form.executive_summary.sector_alignment}
+                    onChange={setNested('executive_summary', 'sector_alignment')}
+                  />
+                  {!alignmentCustomized && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAlignmentExpanded(false)
+                        setForm((f) => ({
+                          ...f,
+                          executive_summary: {
+                            ...f.executive_summary,
+                            sector_alignment: draft.defaultSectorAlignmentText(
+                              f.sector,
+                              f.conference_info?.conference_name,
+                            ),
+                          },
+                        }))
+                      }}
+                      className="text-sm font-medium text-slate-600 hover:text-portal-primary hover:underline"
+                    >
+                      Use suggested text
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
             <Field label="Investment Ask (summary)" value={form.executive_summary.investment_ask_summary} onChange={setNested('executive_summary', 'investment_ask_summary')} required />
           </div>
         )}
@@ -1002,12 +1262,34 @@ export default function NewProposal({ variant = 'legacy' }) {
         {!isMm && contentStep === 11 && (
           <div className="space-y-6">
             <SectionTitle step={step} totalSteps={maxStep} title="MOU" />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Scope" value={form.mou_scope} onChange={setField('mou_scope')} />
-              <Select label="Sector" value={form.mou_sector} onChange={setField('mou_sector')} options={sectors} />
+            <p className="text-sm text-slate-600">
+              Sector and demand are synced from <strong>Key Sector</strong> (Step 5) and{' '}
+              <strong>Investment Ask</strong> (Step 9) when you save draft — no need to enter them
+              again here.
+            </p>
+            <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm sm:grid-cols-2">
+              <div>
+                <p className="font-medium text-slate-700">Sector</p>
+                <p className="mt-1 text-slate-600">
+                  {form.sector || '— complete Step 5 (Key Sector)'}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-700">Demand</p>
+                <p className="mt-1 text-slate-600">
+                  {form.investment_ask?.total_project_cost_usd
+                    ? `USD ${form.investment_ask.total_project_cost_usd} million`
+                    : '— complete Step 9 (Investment Ask)'}
+                </p>
+              </div>
             </div>
-            <Textarea label="Description" value={form.mou_description} onChange={setField('mou_description')} />
-            <Textarea label="Demand" value={form.mou_demand} onChange={setField('mou_demand')} />
+            <Field label="Scope" value={form.mou_scope} onChange={setField('mou_scope')} />
+            <Textarea
+              label="Description"
+              hint="Optional — narrative for the MOU tab. Backend may also sync from project overview."
+              value={form.mou_description}
+              onChange={setField('mou_description')}
+            />
             <FileField
               label="MOU File (PDF/DOC/DOCX)"
               uploading={uploading === 'mou_file_url'}
@@ -1263,11 +1545,12 @@ function Field({ label, type = 'text', value, onChange, required }) {
   )
 }
 
-function Textarea({ label, value, onChange, required }) {
+function Textarea({ label, value, onChange, required, hint }) {
   const id = label.toLowerCase().replace(/\s/g, '-')
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      {hint && <p className="mb-2 text-xs text-slate-500">{hint}</p>}
       <textarea id={id} rows={3} value={value} onChange={onChange} required={required} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30" />
     </div>
   )

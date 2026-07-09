@@ -8,6 +8,7 @@ import {
   fundUtilizationTotal,
   getProposalDisplayTitle,
 } from '../constants/proposalTemplate'
+import { proposalSectionHasData } from '../utils/mouConferenceFields'
 import { resolveFileUrl } from '../utils/format'
 import { formatDate } from '../utils/format'
 
@@ -52,6 +53,7 @@ export default function ProposalDetailPanel({
         onEdit={onEditFields}
       />
 
+      {proposalSectionHasData(proposal, 'engagement') && (
       <Section title="Engagement & Conference">
         <GridFields
           items={[
@@ -80,7 +82,9 @@ export default function ProposalDetailPanel({
           ]}
         />
       </Section>
+      )}
 
+      {proposalSectionHasData(proposal, 'parties') && (
       <div className="grid gap-4 lg:grid-cols-2">
         <InfoCard title="Party A" icon="🇵🇰" className="lg:col-span-1">
           <InfoRow
@@ -115,7 +119,9 @@ export default function ProposalDetailPanel({
           <InfoRow label="Country" value={proposal.party_b_country} />
         </InfoCard>
       </div>
+      )}
 
+      {(proposalSectionHasData(proposal, 'identity') || proposalSectionHasData(proposal, 'mouCard')) && (
       <div className="grid gap-4 lg:grid-cols-3">
         <InfoCard title="Cover & Identity" icon="🏢" className="lg:col-span-1">
           <InfoRow label="Company" value={proposal.company_name} />
@@ -136,7 +142,9 @@ export default function ProposalDetailPanel({
           )}
         </InfoCard>
       </div>
+      )}
 
+      {proposalSectionHasData(proposal, 'executive') && (
       <Section title="Executive Summary">
         <GridFields
           items={[
@@ -148,7 +156,9 @@ export default function ProposalDetailPanel({
           ]}
         />
       </Section>
+      )}
 
+      {proposalSectionHasData(proposal, 'company') && (
       <Section title="Company Overview">
         <GridFields
           items={[
@@ -163,7 +173,9 @@ export default function ProposalDetailPanel({
           ]}
         />
       </Section>
+      )}
 
+      {proposalSectionHasData(proposal, 'project') && (
       <Section title="Project Overview">
         <GridFields
           items={[
@@ -179,8 +191,9 @@ export default function ProposalDetailPanel({
           ]}
         />
       </Section>
+      )}
 
-      {proposal.financials?.years?.length > 0 && (
+      {proposalSectionHasData(proposal, 'financials') && (
         <Section title="Financials">
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="min-w-full text-left text-xs">
@@ -243,6 +256,7 @@ export default function ProposalDetailPanel({
         </Section>
       )}
 
+      {proposalSectionHasData(proposal, 'investment') && (
       <Section title="Investment Ask">
         <GridFields
           items={[
@@ -267,7 +281,9 @@ export default function ProposalDetailPanel({
           ]}
         />
       </Section>
+      )}
 
+      {proposalSectionHasData(proposal, 'contact') && (
       <Section title="Contact">
         <GridFields
           items={[
@@ -279,17 +295,22 @@ export default function ProposalDetailPanel({
           ]}
         />
       </Section>
+      )}
 
+      {proposalSectionHasData(proposal, 'files') && (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <FileCard label="Company Logo" url={proposal.company_logo_url} onOpen={open} title={title} />
         <FileCard label="Cover Image" url={proposal.cover_image_url} onOpen={open} title={title} />
         <FileCard label="Pitch Deck" url={proposal.proposal_file_url} onOpen={open} title={title} />
         <FileCard label="MOU Document" url={proposal.mou_file_url} onOpen={open} title={title} />
       </div>
+      )}
 
+      {proposalSectionHasData(proposal, 'mouDescription') && (
       <DetailBlock title="MOU Description">
-        <p className="text-sm leading-relaxed text-slate-700">{proposal.mou_description || '—'}</p>
+        <p className="text-sm leading-relaxed text-slate-700">{proposal.mou_description}</p>
       </DetailBlock>
+      )}
     </div>
   )
 }
