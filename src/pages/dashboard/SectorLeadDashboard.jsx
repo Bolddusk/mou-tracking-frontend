@@ -12,10 +12,13 @@ import OpportunitiesDashboardTabs from '../../components/proposals/Opportunities
 import ProposalOpportunitiesToolbar from '../../components/proposals/ProposalOpportunitiesToolbar'
 import {
   buildCooperationModeFilters,
+  buildDashboardListTabFilters,
   buildSectorLeadListParams,
+  dashboardTabFiltersToPills,
   DEFAULT_MOU_LIFECYCLE_STATUSES,
+  getListTabQuery,
+  getMouLifecycleCounts,
   getProposalListEmptyMessage,
-  PROPOSAL_STATUS_FILTERS,
 } from '../../constants/proposalFilters'
 import {
   ActionGroup,
@@ -55,7 +58,7 @@ export default function SectorLeadDashboard() {
   const { user, rbac } = useAuth()
   const profilePaths = getPartyAProfilePaths(user?.role)
 
-  const [statusFilter, setStatusFilter] = useState('')
+  const [listTabFilter, setListTabFilter] = useState('all')
   const [cooperationModeFilter, setCooperationModeFilter] = useState('')
   const [conferenceFilter, setConferenceFilter] = useState('')
   const [page, setPage] = useState(1)
@@ -66,8 +69,6 @@ export default function SectorLeadDashboard() {
   const [filterOptions, setFilterOptions] = useState(null)
   const [proposals, setProposals] = useState([])
   const [pagination, setPagination] = useState(null)
-  const [statsProposals, setStatsProposals] = useState([])
-  const [statsTotal, setStatsTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -120,6 +121,15 @@ export default function SectorLeadDashboard() {
     }
   }, [user?.sector, user?.assigned_sectors, user?.primary_sector])
 
+  const refreshFilterOptions = useCallback(async () => {
+    try {
+      const data = await proposalsApi.getProposalFilterOptions()
+      setFilterOptions(data)
+    } catch {
+      /* keep existing options */
+    }
+  }, [])
+
   const cooperationModeFilters = useMemo(
     () => buildCooperationModeFilters(filterOptions?.cooperation_modes),
     [filterOptions?.cooperation_modes],
@@ -144,6 +154,21 @@ export default function SectorLeadDashboard() {
     [filterOptions?.mou_lifecycle_statuses],
   )
 
+  const dashboardTabFilters = useMemo(
+    () => buildDashboardListTabFilters(filterOptions),
+    [filterOptions],
+  )
+
+  const lifecycleCounts = useMemo(
+    () => getMouLifecycleCounts(filterOptions),
+    [filterOptions],
+  )
+
+  const toolbarTabFilters = useMemo(
+    () => dashboardTabFiltersToPills(dashboardTabFilters),
+    [dashboardTabFilters],
+  )
+
   const dashboardHeader = useMemo(
     () =>
       getOpportunitiesDashboardHeader({
@@ -165,8 +190,7 @@ export default function SectorLeadDashboard() {
   const listParams = useMemo(
     () =>
       buildSectorLeadListParams({
-        status: statusFilter,
-        mou_lifecycle: advancedFilters.mouLifecycle,
+        ...getListTabQuery(listTabFilter, dashboardTabFilters),
         cooperation_mode: cooperationModeFilter,
         conference_key: conferenceFilter,
         sifc_category: advancedFilters.sifcCategory,
@@ -176,23 +200,12 @@ export default function SectorLeadDashboard() {
         page,
         limit,
       }),
-    [statusFilter, searchQuery, advancedFilters, cooperationModeFilter, conferenceFilter, page, limit],
+    [listTabFilter, dashboardTabFilters, searchQuery, advancedFilters, cooperationModeFilter, conferenceFilter, page, limit],
   )
 
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, cooperationModeFilter, conferenceFilter, searchQuery, advancedFilters])
-
-  const loadStats = useCallback(async () => {
-    try {
-      const result = await proposalsApi.getOpportunitiesListPaginated({ limit: 100, page: 1 }, rbac)
-      setStatsProposals(result.data)
-      setStatsTotal(result.pagination?.total ?? result.data.length)
-    } catch {
-      setStatsProposals([])
-      setStatsTotal(0)
-    }
-  }, [rbac])
+  }, [listTabFilter, cooperationModeFilter, conferenceFilter, searchQuery, advancedFilters])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -211,28 +224,10 @@ export default function SectorLeadDashboard() {
   }, [listParams, rbac])
 
   useEffect(() => {
-    loadStats()
-  }, [loadStats])
-
-  useEffect(() => {
     load()
   }, [load])
 
-  const stats = useMemo(() => {
-    const counts = {
-      total: statsTotal,
-      submitted: 0,
-      resubmitted: 0,
-      approved: 0,
-      completed: 0,
-      rejected: 0,
-    }
-    for (const p of statsProposals) {
-      const s = (p.status || '').toLowerCase()
-      if (s in counts) counts[s]++
-    }
-    return counts
-  }, [statsProposals, statsTotal])
+  const stats = lifecycleCounts
 
   const hasActiveAdvancedFilters = useMemo(
     () => Object.values(advancedFilters).some(Boolean),
@@ -247,9 +242,9 @@ export default function SectorLeadDashboard() {
 
   const emptyMessage = getProposalListEmptyMessage({
     totalCount: pagination?.total ?? proposals.length,
-    statusFilter,
+    listTabFilter,
     searchQuery,
-    statusFilters: PROPOSAL_STATUS_FILTERS.sectorLead,
+    tabFilters: dashboardTabFilters,
     defaultMessage: hasActiveFilters
       ? 'No opportunities match the current filters.'
       : 'No opportunities in this queue.',
@@ -258,7 +253,7 @@ export default function SectorLeadDashboard() {
   const clearAllFilters = () => {
     setSearchInput('')
     setSearchQuery('')
-    setStatusFilter('')
+    setListTabFilter('all')
     setCooperationModeFilter('')
     setConferenceFilter('')
     setPage(1)
@@ -314,7 +309,7 @@ export default function SectorLeadDashboard() {
         setSuccess(`Opportunity #${actionProposal.id} rejected`)
       }
       closeAction()
-      await Promise.all([load(), loadStats()])
+      await Promise.all([load(), refreshFilterOptions()])
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -397,15 +392,10 @@ export default function SectorLeadDashboard() {
       <Alert type="success" message={success} onClose={() => setSuccess('')} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard color="teal" label="In view" value={stats.total} icon={<span>Σ</span>} />
-        <StatCard
-          color="yellow"
-          label="Pending"
-          value={stats.submitted + stats.resubmitted}
-          icon={<span>⏳</span>}
-        />
-        <StatCard color="green" label="Approved" value={stats.approved} icon={<span>✓</span>} />
-        <StatCard color="red" label="Rejected" value={stats.rejected} icon={<span>✕</span>} />
+        <StatCard color="teal" label="Total" value={stats.all ?? 0} icon={<span>Σ</span>} />
+        <StatCard color="green" label="Active" value={stats.active ?? 0} icon={<span>✓</span>} />
+        <StatCard color="yellow" label="Inactive" value={stats.inactive ?? 0} icon={<span>○</span>} />
+        <StatCard color="blue" label="Execution" value={stats.execution ?? 0} icon={<span>⏳</span>} />
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -419,9 +409,9 @@ export default function SectorLeadDashboard() {
           title={listToolbarTitle}
           search={searchInput}
           onSearchChange={setSearchInput}
-          statusFilters={PROPOSAL_STATUS_FILTERS.sectorLead}
-          statusValue={statusFilter}
-          onStatusChange={setStatusFilter}
+          statusFilters={toolbarTabFilters}
+          statusValue={listTabFilter}
+          onStatusChange={setListTabFilter}
         />
 
         <ProposalOpportunitiesFilterBar
@@ -443,8 +433,9 @@ export default function SectorLeadDashboard() {
           onDateToChange={(v) => setAdvanced('dateTo', v)}
           mouLifecycleStatuses={mouLifecycleStatuses}
           hideSectorFilter
+          hideMouLifecycleFilter
           onClearAll={clearAllFilters}
-          hasActiveFilters={hasActiveFilters || Boolean(statusFilter)}
+          hasActiveFilters={hasActiveFilters || listTabFilter !== 'all'}
           onReportError={setError}
         />
 

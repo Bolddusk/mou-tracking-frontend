@@ -25,9 +25,13 @@ import OpportunitiesDashboardTabs from '../../components/proposals/Opportunities
 import ProposalOpportunitiesToolbar from '../../components/proposals/ProposalOpportunitiesToolbar'
 import {
   buildCooperationModeFilters,
+  buildDashboardListTabFilters,
   buildProposalListParams,
   buildSectorLeadListParams,
+  dashboardTabFiltersToPills,
   DEFAULT_MOU_LIFECYCLE_STATUSES,
+  getListTabQuery,
+  getMouLifecycleCounts,
   getProposalListEmptyMessage,
   PROPOSAL_STATUS_FILTERS,
 } from '../../constants/proposalFilters'
@@ -56,8 +60,10 @@ export default function SuperAdminDashboard() {
   const location = useLocation()
   const { rbac, isSuperAdmin } = useAuth()
   const listScope = useMemo(() => getProposalsListScope(rbac), [rbac])
+  const usesLifecycleTabs = listScope !== 'own'
   const pageTitle = useMemo(() => getOpportunitiesNavLabel(rbac), [rbac])
   const [statusFilter, setStatusFilter] = useState('')
+  const [listTabFilter, setListTabFilter] = useState('all')
   const [cooperationModeFilter, setCooperationModeFilter] = useState('')
   const [conferenceFilter, setConferenceFilter] = useState('')
   const [page, setPage] = useState(1)
@@ -68,8 +74,6 @@ export default function SuperAdminDashboard() {
   const [filterOptions, setFilterOptions] = useState(null)
   const [proposals, setProposals] = useState([])
   const [pagination, setPagination] = useState(null)
-  const [statsProposals, setStatsProposals] = useState([])
-  const [statsTotal, setStatsTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -110,6 +114,15 @@ export default function SuperAdminDashboard() {
     }
   }, [])
 
+  const refreshFilterOptions = useCallback(async () => {
+    try {
+      const data = await proposalsApi.getProposalFilterOptions()
+      setFilterOptions(data)
+    } catch {
+      /* keep existing options */
+    }
+  }, [])
+
   const cooperationModeFilters = useMemo(
     () => buildCooperationModeFilters(filterOptions?.cooperation_modes),
     [filterOptions?.cooperation_modes],
@@ -126,6 +139,23 @@ export default function SuperAdminDashboard() {
       DEFAULT_MOU_LIFECYCLE_STATUSES,
     [filterOptions?.mou_lifecycle_statuses],
   )
+
+  const dashboardTabFilters = useMemo(
+    () => buildDashboardListTabFilters(filterOptions),
+    [filterOptions],
+  )
+
+  const lifecycleCounts = useMemo(
+    () => getMouLifecycleCounts(filterOptions),
+    [filterOptions],
+  )
+
+  const toolbarTabFilters = useMemo(() => {
+    if (usesLifecycleTabs) return dashboardTabFiltersToPills(dashboardTabFilters)
+    if (listScope === 'sector') return PROPOSAL_STATUS_FILTERS.sectorLead
+    if (listScope === 'own') return PROPOSAL_STATUS_FILTERS.partyA
+    return PROPOSAL_STATUS_FILTERS.superAdmin
+  }, [usesLifecycleTabs, dashboardTabFilters, listScope])
 
   const dashboardHeader = useMemo(
     () =>
@@ -148,10 +178,15 @@ export default function SuperAdminDashboard() {
     : pageTitle
 
   const listParams = useMemo(() => {
+    const tabQuery = usesLifecycleTabs
+      ? getListTabQuery(listTabFilter, dashboardTabFilters)
+      : {}
     const base = buildProposalListParams({
-      status: statusFilter,
+      status: usesLifecycleTabs ? '' : statusFilter,
       sector: advancedFilters.sector,
-      mou_lifecycle: advancedFilters.mouLifecycle,
+      mou_lifecycle: usesLifecycleTabs
+        ? tabQuery.mou_lifecycle || ''
+        : advancedFilters.mouLifecycle,
       cooperation_mode: cooperationModeFilter,
       conference_key: conferenceFilter,
       sifc_category: advancedFilters.sifcCategory,
@@ -167,6 +202,9 @@ export default function SuperAdminDashboard() {
     if (listScope === 'own') return buildSectorLeadListParams(base)
     return base
   }, [
+    usesLifecycleTabs,
+    listTabFilter,
+    dashboardTabFilters,
     statusFilter,
     searchQuery,
     advancedFilters,
@@ -178,29 +216,16 @@ export default function SuperAdminDashboard() {
     archiveFilter,
   ])
 
-  const statusFilters = useMemo(() => {
-    if (listScope === 'sector') return PROPOSAL_STATUS_FILTERS.sectorLead
-    if (listScope === 'own') return PROPOSAL_STATUS_FILTERS.partyA
-    return PROPOSAL_STATUS_FILTERS.superAdmin
-  }, [listScope])
-
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, cooperationModeFilter, conferenceFilter, searchQuery, advancedFilters, archiveFilter])
-
-  const loadStats = useCallback(async () => {
-    try {
-      const result = await proposalsApi.getOpportunitiesListPaginated(
-        { limit: 100, page: 1 },
-        rbac,
-      )
-      setStatsProposals(result.data)
-      setStatsTotal(result.pagination?.total ?? result.data.length)
-    } catch {
-      setStatsProposals([])
-      setStatsTotal(0)
-    }
-  }, [rbac])
+  }, [
+    usesLifecycleTabs ? listTabFilter : statusFilter,
+    cooperationModeFilter,
+    conferenceFilter,
+    searchQuery,
+    advancedFilters,
+    archiveFilter,
+  ])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -219,21 +244,19 @@ export default function SuperAdminDashboard() {
   }, [listParams, rbac])
 
   useEffect(() => {
-    loadStats()
-  }, [loadStats])
-
-  useEffect(() => {
     load()
   }, [load])
 
   const stats = useMemo(() => {
-    const counts = { total: statsTotal, draft: 0, submitted: 0, approved: 0, rejected: 0 }
-    for (const p of statsProposals) {
+    if (usesLifecycleTabs) return lifecycleCounts
+    const counts = { total: pagination?.total ?? 0, draft: 0, submitted: 0, approved: 0, rejected: 0 }
+    for (const p of proposals) {
       const s = (p.status || '').toLowerCase()
       if (s in counts) counts[s]++
     }
+    counts.total = pagination?.total ?? proposals.length
     return counts
-  }, [statsProposals, statsTotal])
+  }, [usesLifecycleTabs, lifecycleCounts, proposals, pagination?.total])
 
   const hasActiveAdvancedFilters = useMemo(
     () => Object.values(advancedFilters).some(Boolean),
@@ -249,9 +272,11 @@ export default function SuperAdminDashboard() {
 
   const emptyMessage = getProposalListEmptyMessage({
     totalCount: pagination?.total ?? proposals.length,
-    statusFilter,
+    listTabFilter: usesLifecycleTabs ? listTabFilter : '',
+    statusFilter: usesLifecycleTabs ? '' : statusFilter,
     searchQuery,
-    statusFilters,
+    tabFilters: dashboardTabFilters,
+    statusFilters: toolbarTabFilters,
     defaultMessage: hasActiveFilters
       ? 'No opportunities match the current filters.'
       : 'No opportunities found.',
@@ -260,7 +285,8 @@ export default function SuperAdminDashboard() {
   const clearAllFilters = () => {
     setSearchInput('')
     setSearchQuery('')
-    setStatusFilter('')
+    if (usesLifecycleTabs) setListTabFilter('all')
+    else setStatusFilter('')
     setCooperationModeFilter('')
     setConferenceFilter('')
     setPage(1)
@@ -290,7 +316,7 @@ export default function SuperAdminDashboard() {
           `Cleared ${res?.dismissed_count ?? 0} pending update request(s)`,
       )
       await load()
-      await loadStats()
+      await refreshFilterOptions()
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -353,7 +379,7 @@ export default function SuperAdminDashboard() {
         setSuccess(`Opportunity #${actionProposal.id} rejected`)
       }
       closeAction()
-      await Promise.all([load(), loadStats()])
+      await Promise.all([load(), refreshFilterOptions()])
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -438,12 +464,23 @@ export default function SuperAdminDashboard() {
       <Alert type="error" message={error} onClose={() => setError('')} />
       <Alert type="success" message={success} onClose={() => setSuccess('')} />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard color="teal" label="Total" value={stats.total} icon={<span>Σ</span>} />
-        <StatCard color="yellow" label="Draft" value={stats.draft} icon={<span>✎</span>} />
-        <StatCard color="blue" label="Submitted" value={stats.submitted} icon={<span>⏳</span>} />
-        <StatCard color="green" label="Approved" value={stats.approved} icon={<span>✓</span>} />
-        <StatCard color="red" label="Rejected" value={stats.rejected} icon={<span>✕</span>} />
+      <div className={`grid gap-4 sm:grid-cols-2 ${usesLifecycleTabs ? 'xl:grid-cols-4' : 'xl:grid-cols-5'}`}>
+        {usesLifecycleTabs ? (
+          <>
+            <StatCard color="teal" label="Total" value={stats.all ?? 0} icon={<span>Σ</span>} />
+            <StatCard color="green" label="Active" value={stats.active ?? 0} icon={<span>✓</span>} />
+            <StatCard color="yellow" label="Inactive" value={stats.inactive ?? 0} icon={<span>○</span>} />
+            <StatCard color="blue" label="Execution" value={stats.execution ?? 0} icon={<span>⏳</span>} />
+          </>
+        ) : (
+          <>
+            <StatCard color="teal" label="Total" value={stats.total} icon={<span>Σ</span>} />
+            <StatCard color="yellow" label="Draft" value={stats.draft} icon={<span>✎</span>} />
+            <StatCard color="blue" label="Submitted" value={stats.submitted} icon={<span>⏳</span>} />
+            <StatCard color="green" label="Approved" value={stats.approved} icon={<span>✓</span>} />
+            <StatCard color="red" label="Rejected" value={stats.rejected} icon={<span>✕</span>} />
+          </>
+        )}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -457,9 +494,9 @@ export default function SuperAdminDashboard() {
           title={listToolbarTitle}
           search={searchInput}
           onSearchChange={setSearchInput}
-          statusFilters={statusFilters}
-          statusValue={statusFilter}
-          onStatusChange={setStatusFilter}
+          statusFilters={toolbarTabFilters}
+          statusValue={usesLifecycleTabs ? listTabFilter : statusFilter}
+          onStatusChange={usesLifecycleTabs ? setListTabFilter : setStatusFilter}
         />
 
         {listScope === 'all' && isSuperAdmin && dashboardView === 'opportunities' && (
@@ -500,11 +537,15 @@ export default function SuperAdminDashboard() {
           sectors={filterOptions?.sectors || []}
           mouLifecycleStatuses={mouLifecycleStatuses}
           hideSectorFilter={listScope !== 'all'}
+          hideMouLifecycleFilter={usesLifecycleTabs}
           showArchiveFilter={listScope === 'all'}
           archiveFilter={archiveFilter}
           onArchiveFilterChange={setArchiveFilter}
           onClearAll={clearAllFilters}
-          hasActiveFilters={hasActiveFilters || Boolean(statusFilter)}
+          hasActiveFilters={
+            hasActiveFilters ||
+            (usesLifecycleTabs ? listTabFilter !== 'all' : Boolean(statusFilter))
+          }
           onReportError={setError}
         />
 

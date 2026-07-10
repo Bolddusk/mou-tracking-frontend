@@ -58,6 +58,7 @@ export default function ProposalOpportunitiesFilterBar({
   onClearAll,
   hasActiveFilters = false,
   hideSectorFilter = false,
+  hideMouLifecycleFilter = false,
   showArchiveFilter = false,
   archiveFilter = '',
   onArchiveFilterChange,
@@ -135,6 +136,7 @@ export default function ProposalOpportunitiesFilterBar({
           </FilterSelect>
         )}
 
+        {!hideMouLifecycleFilter && (
         <FilterSelect label="MOU Status" value={mouLifecycle} onChange={onMouLifecycleChange}>
           <option value="">All</option>
           {mouLifecycleStatuses.map((s) => (
@@ -143,6 +145,7 @@ export default function ProposalOpportunitiesFilterBar({
             </option>
           ))}
         </FilterSelect>
+        )}
 
         {sifcCategories.length > 0 && (
           <FilterSelect label="SIFC Category" value={sifcCategory} onChange={onSifcCategoryChange}>

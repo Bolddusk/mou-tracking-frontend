@@ -84,6 +84,45 @@ export const DEFAULT_MOU_LIFECYCLE_STATUSES = [
   { value: 'execution', label: 'In Execution' },
 ]
 
+export const DEFAULT_DASHBOARD_LIST_TAB_FILTERS = [
+  { key: 'all', label: 'All', query: {} },
+  { key: 'active', label: 'Active', query: { mou_lifecycle: 'active' } },
+  { key: 'inactive', label: 'Inactive', query: { mou_lifecycle: 'inactive' } },
+  { key: 'execution', label: 'Execution', query: { mou_lifecycle: 'execution' } },
+]
+
+export const DEFAULT_MOU_LIFECYCLE_COUNTS = {
+  all: 0,
+  active: 0,
+  inactive: 0,
+  execution: 0,
+}
+
+/** Tab pills + list query from GET /api/proposals/filter-options */
+export function buildDashboardListTabFilters(filterOptions) {
+  const tabs = filterOptions?.dashboard_list_tab_filters
+  if (Array.isArray(tabs) && tabs.length) return tabs
+  return DEFAULT_DASHBOARD_LIST_TAB_FILTERS
+}
+
+export function getMouLifecycleCounts(filterOptions) {
+  const counts = filterOptions?.mou_lifecycle_counts
+  if (counts && typeof counts === 'object') {
+    return { ...DEFAULT_MOU_LIFECYCLE_COUNTS, ...counts }
+  }
+  return { ...DEFAULT_MOU_LIFECYCLE_COUNTS }
+}
+
+export function getListTabQuery(tabKey, tabFilters = DEFAULT_DASHBOARD_LIST_TAB_FILTERS) {
+  const tab = tabFilters.find((t) => t.key === tabKey)
+  if (!tab?.query || typeof tab.query !== 'object') return {}
+  return { ...tab.query }
+}
+
+export function dashboardTabFiltersToPills(tabFilters) {
+  return tabFilters.map(({ key, label }) => ({ key, label }))
+}
+
 const DEFAULT_COOPERATION_MODES = ['mou', 'jv', 'agreement']
 
 /** Tab filters for cooperation mode (All + API options). */
@@ -173,12 +212,18 @@ export function getPaginationRange(pagination) {
 export function getProposalListEmptyMessage({
   totalCount = 0,
   statusFilter = '',
+  listTabFilter = '',
   searchQuery = '',
   statusFilters = [],
+  tabFilters = [],
   defaultMessage = 'No opportunities found.',
 }) {
   if (totalCount === 0) return defaultMessage
   if (searchQuery.trim()) return 'No opportunities match your search.'
+  if (listTabFilter && listTabFilter !== 'all') {
+    const label = tabFilters.find((f) => f.key === listTabFilter)?.label?.toLowerCase()
+    if (label) return `No ${label} opportunities.`
+  }
   if (statusFilter) {
     const label = statusFilters.find((f) => f.key === statusFilter)?.label?.toLowerCase()
     if (label) return `No ${label} opportunities.`
