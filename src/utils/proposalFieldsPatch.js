@@ -1,9 +1,9 @@
 import { parseExecutiveSummary } from './mouConferenceFields'
 
+/** Progress is updated via Progress tab only — not Edit MOU fields. */
 const EXECUTIVE_SUMMARY_FORM_KEYS = [
   'sifc_category',
   'mou_operational_status',
-  'progress',
   'bottlenecks',
   'tentative_timeline',
   'action_taken',

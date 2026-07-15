@@ -188,6 +188,8 @@ export function loadDraftFromProposal(proposal) {
 
 export function proposalToFormPayload(form, proposalId) {
   const payload = { ...form }
+  // Direct MOU wizard no longer collects project_type (DB column may still exist on older rows)
+  delete payload.project_type
   if (proposalId) payload.proposal_id = proposalId
   payload.cooperation_mode = form.cooperation_mode || 'mou'
   if (form.conference_key) payload.conference_key = form.conference_key

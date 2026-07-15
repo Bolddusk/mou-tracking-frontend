@@ -1,18 +1,22 @@
 import { useAuth } from '../../context/AuthContext'
 import {
-  getPartyAContactItems,
-  getPartyBContactItems,
+  getPartyCardSkeletonFields,
 } from '../../utils/proposalDisplay'
 import { getPartyAProfilePaths, getPartyBProfilePaths } from '../../constants/profileRoutes'
 import PartyProfileSnapshotCard, {
   PARTY_A_MANDATORY,
   PARTY_B_MANDATORY,
+  PROFILE_BANNER,
 } from './PartyProfileSnapshotCard'
 
 export default function ProposalMouPartyCards({ proposal, onEditContacts, canEditContacts }) {
   const { user } = useAuth()
   const partyAPaths = getPartyAProfilePaths(user?.role)
   const partyBPaths = getPartyBProfilePaths(user?.role)
+
+  const partyAFields = getPartyCardSkeletonFields(proposal, 'a')
+  const partyBFields = getPartyCardSkeletonFields(proposal, 'b')
+  const showSharedBanner = partyAFields.needsBanner || partyBFields.needsBanner
 
   const partyAViewId =
     proposal?.party_a_profile?.data?.user?.id ||
@@ -33,31 +37,42 @@ export default function ProposalMouPartyCards({ proposal, onEditContacts, canEdi
     ) : null
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <PartyProfileSnapshotCard
-        title="Pakistani Company"
-        snapshot={proposal?.party_a_profile}
-        contactItems={getPartyAContactItems(proposal)}
-        mandatoryDocTypes={PARTY_A_MANDATORY}
-        profileViewPath={
-          proposal?.party_a_profile?.data && partyAViewId
-            ? partyAPaths.detail(partyAViewId)
-            : null
-        }
-        editContactsAction={editButton}
-      />
-      <PartyProfileSnapshotCard
-        title="Chinese Company"
-        snapshot={proposal?.party_b_profile}
-        contactItems={getPartyBContactItems(proposal)}
-        mandatoryDocTypes={PARTY_B_MANDATORY}
-        profileViewPath={
-          proposal?.party_b_profile?.data && partyBViewId
-            ? partyBPaths.detail(partyBViewId)
-            : null
-        }
-        editContactsAction={editButton}
-      />
+    <div className="space-y-4">
+      {showSharedBanner && (
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-amber-900">{PROFILE_BANNER}</p>
+          {editButton}
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <PartyProfileSnapshotCard
+          title="Pakistani Company"
+          snapshot={proposal?.party_a_profile}
+          fields={partyAFields}
+          showBanner={false}
+          mandatoryDocTypes={PARTY_A_MANDATORY}
+          profileViewPath={
+            proposal?.party_a_profile?.data && partyAViewId
+              ? partyAPaths.detail(partyAViewId)
+              : null
+          }
+          editContactsAction={editButton}
+        />
+        <PartyProfileSnapshotCard
+          title="Chinese Company"
+          snapshot={proposal?.party_b_profile}
+          fields={partyBFields}
+          showBanner={false}
+          mandatoryDocTypes={PARTY_B_MANDATORY}
+          profileViewPath={
+            proposal?.party_b_profile?.data && partyBViewId
+              ? partyBPaths.detail(partyBViewId)
+              : null
+          }
+          editContactsAction={editButton}
+        />
+      </div>
     </div>
   )
 }

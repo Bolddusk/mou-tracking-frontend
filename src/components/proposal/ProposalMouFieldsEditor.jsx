@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as proposalsApi from '../../api/proposals'
 import { COOPERATION_MODE_LABELS } from '../../constants/proposalFilters'
-import { MOU_OPERATIONAL_STATUS_OPTIONS } from '../../utils/mouConferenceFields'
+import { MOU_OPERATIONAL_STATUS_OPTIONS, parseExecutiveSummary } from '../../utils/mouConferenceFields'
 import Alert from '../Alert'
 import Modal from '../Modal'
+import MouProgressValue from './MouProgressValue'
 import { getErrorMessage } from '../../utils/format'
 import {
   buildProposalFieldsPatch,
@@ -111,6 +112,11 @@ export default function ProposalMouFieldsEditor({
 
   const editable = catalog?.editable !== false
   const locked = catalog?.locked === true
+  const readOnlyEsKeys = useMemo(() => {
+    const fromCatalog = catalog?.read_only_executive_summary_keys
+    if (Array.isArray(fromCatalog) && fromCatalog.length) return fromCatalog
+    return ['progress']
+  }, [catalog?.read_only_executive_summary_keys])
   const canChangeSector = catalogLoading
     ? proposal?.capabilities?.can_change_sector === true
     : catalog?.can_change_sector === true
@@ -313,14 +319,17 @@ export default function ProposalMouFieldsEditor({
               onChange={(v) => setEs('project_overview', v)}
             />
           </label>
-          <label className="block">
-            <FieldLabel>Progress</FieldLabel>
-            <TextArea
-              rows={4}
-              value={form.executive_summary.progress}
-              onChange={(v) => setEs('progress', v)}
-            />
-          </label>
+          {readOnlyEsKeys.includes('progress') && (
+            <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+              <FieldLabel hint="read-only">Progress</FieldLabel>
+              <div className="mt-1 text-sm text-slate-800">
+                <MouProgressValue value={parseExecutiveSummary(proposal).progress} />
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Update progress from the <strong>Progress</strong> tab — not from Edit MOU fields.
+              </p>
+            </div>
+          )}
           <label className="block">
             <FieldLabel>Bottlenecks</FieldLabel>
             <TextArea

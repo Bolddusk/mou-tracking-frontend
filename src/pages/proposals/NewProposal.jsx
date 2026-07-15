@@ -1049,16 +1049,19 @@ export default function NewProposal({ variant = 'legacy' }) {
           <div className="space-y-5">
             <SectionTitle step={step} totalSteps={maxStep} title="Executive Summary" />
             {!isMm && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Select label="Key Sector" value={form.sector} onChange={applySectorSelection} options={sectors} />
-              <Select label="Project Type" value={form.project_type} onChange={setField('project_type')} options={PROJECT_TYPES} />
-            </div>
-            )}
-            {!isMm && (
-              <p className="text-sm text-slate-600">
-                <strong>Key Sector</strong> routes your proposal to the right Sector Lead. The alignment
-                note below is a short executive-summary narrative — not the same field as sector.
-              </p>
+              <>
+                <Select
+                  label="Key Sector"
+                  value={form.sector}
+                  onChange={applySectorSelection}
+                  options={sectors}
+                />
+                <p className="text-sm text-slate-600">
+                  <strong>Key Sector</strong> routes your proposal to the right Sector Lead. The
+                  alignment note below is a short executive-summary narrative — not the same field
+                  as sector.
+                </p>
+              </>
             )}
             {!isMm && (
               <div>
@@ -1263,19 +1266,18 @@ export default function NewProposal({ variant = 'legacy' }) {
           <div className="space-y-6">
             <SectionTitle step={step} totalSteps={maxStep} title="MOU" />
             <p className="text-sm text-slate-600">
-              Sector and demand are synced from <strong>Key Sector</strong> (Step 5) and{' '}
-              <strong>Investment Ask</strong> (Step 9) when you save draft — no need to enter them
-              again here.
+              Final step: add <strong>Scope</strong> and the MOU file. Sector and Demand sync from
+              earlier steps (Key Sector + Investment Ask) — edit those on Details after approve.
             </p>
             <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm sm:grid-cols-2">
               <div>
-                <p className="font-medium text-slate-700">Sector</p>
+                <p className="font-medium text-slate-700">Sector (from Step 5)</p>
                 <p className="mt-1 text-slate-600">
                   {form.sector || '— complete Step 5 (Key Sector)'}
                 </p>
               </div>
               <div>
-                <p className="font-medium text-slate-700">Demand</p>
+                <p className="font-medium text-slate-700">Demand (from Step 9)</p>
                 <p className="mt-1 text-slate-600">
                   {form.investment_ask?.total_project_cost_usd
                     ? `USD ${form.investment_ask.total_project_cost_usd} million`
@@ -1284,12 +1286,6 @@ export default function NewProposal({ variant = 'legacy' }) {
               </div>
             </div>
             <Field label="Scope" value={form.mou_scope} onChange={setField('mou_scope')} />
-            <Textarea
-              label="Description"
-              hint="Optional — narrative for the MOU tab. Backend may also sync from project overview."
-              value={form.mou_description}
-              onChange={setField('mou_description')}
-            />
             <FileField
               label="MOU File (PDF/DOC/DOCX)"
               uploading={uploading === 'mou_file_url'}

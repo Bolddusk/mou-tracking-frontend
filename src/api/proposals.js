@@ -528,6 +528,12 @@ export async function saveProposalMou(proposalId, fields, file) {
   return response.data
 }
 
+/** Delete current MOU file (keeps text fields). DELETE /api/proposals/:id/mou */
+export async function deleteProposalMou(proposalId) {
+  const response = await client.delete(`/api/proposals/${proposalId}/mou`)
+  return response.data
+}
+
 export async function getProposalMessages(proposalId, { limit = 50, before } = {}) {
   const params = { limit }
   if (before != null) params.before = before

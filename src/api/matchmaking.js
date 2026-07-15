@@ -189,3 +189,9 @@ export async function saveMatchMou(matchId, fields, file) {
   })
   return response.data
 }
+
+/** Delete current MOU file. DELETE /api/matchmaking/matches/:id/mou */
+export async function deleteMatchMou(matchId) {
+  const response = await client.delete(`/api/matchmaking/matches/${matchId}/mou`)
+  return response.data
+}

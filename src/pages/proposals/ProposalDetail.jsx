@@ -40,7 +40,6 @@ import {
   buildCredentialPrompts,
   getPartyContactSaveFeedback,
   mergeProposalAfterPartyContacts,
-  needsPartyAAccountSetup,
 } from '../../utils/partyContactProvision'
 import { normalizeProgressListResponse } from '../../utils/progressUpdates'
 
@@ -1116,40 +1115,13 @@ export default function ProposalDetail() {
               onEditContacts={() => setContactsEditorOpen(true)}
             />
           )}
-          {canManagePartyContacts && (
-            <div className="flex flex-col gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1 text-sm text-green-900">
-                {needsPartyAAccountSetup(proposal) && (
-                  <p>
-                    <strong>Party A not linked</strong> — enter contact name + email to create
-                    their portal login.
-                  </p>
-                )}
-                {!proposal.party_b_user_id && (
-                  <p>
-                    <strong>Party B not linked</strong> — add their email and save to enable chat
-                    login.
-                  </p>
-                )}
-                {!needsPartyAAccountSetup(proposal) && proposal.party_b_user_id && (
-                  <p>You can update Party A and Party B contact details for this proposal.</p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setContactsEditorOpen(true)}
-                className="shrink-0 rounded-lg bg-portal-primary px-4 py-2 text-sm font-semibold text-white hover:bg-portal-primary-hover"
-              >
-                Edit contacts
-              </button>
-            </div>
-          )}
         </div>
       ) : activeTab === 'mou' ? (
         <div className="space-y-6">
           <MmMouPanel
           matchId={isMatchmakingMou ? mmMatch?.id : undefined}
           proposalId={isDirectMou ? id : undefined}
+          proposal={proposal}
           canEdit={canEditMou}
           canUploadMou={canUploadMou}
           canEditMouFields={canEditMouFields}

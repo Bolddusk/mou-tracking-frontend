@@ -98,3 +98,81 @@ export function getPartyBLoginEmail(proposal) {
     ''
   )
 }
+
+function contactItemValue(items, matchers) {
+  if (!Array.isArray(items)) return ''
+  for (const item of items) {
+    const label = String(item?.label || '').toLowerCase()
+    if (!matchers.some((m) => label === m || label.includes(m))) continue
+    const value = item?.value != null ? String(item.value).trim() : ''
+    if (value && value !== '—') return value
+  }
+  return ''
+}
+
+/**
+ * Fixed Companies-tab skeleton fields for Party A / Party B.
+ * Uses contacts_display + party_*_info + profile.data when available.
+ */
+export function getPartyCardSkeletonFields(proposal, side = 'a') {
+  const isA = side === 'a'
+  const snapshot = isA ? proposal?.party_a_profile : proposal?.party_b_profile
+  const data = snapshot?.data
+  const profile = data?.profile || {}
+  const user = data?.user || {}
+  const items = isA ? getPartyAContactItems(proposal) : getPartyBContactItems(proposal)
+  // Contact items may omit empties — also read raw info
+  const info = isA ? proposal?.party_a_info || {} : proposal?.party_b_info || {}
+
+  const company =
+    contactItemValue(items, ['company', 'organization']) ||
+    profile.company_name ||
+    (isA
+      ? proposal?.pakistani_company || proposal?.company_name || info.organization_name
+      : proposal?.chinese_company ||
+        info.organization_name ||
+        proposal?.party_b_organization ||
+        proposal?.party_b_name) ||
+    ''
+
+  const contactPerson =
+    contactItemValue(items, ['contact person', 'contact']) ||
+    user.full_name ||
+    info.contact_name ||
+    (isA ? '' : proposal?.party_b_name) ||
+    ''
+
+  const email =
+    contactItemValue(items, ['email']) ||
+    (isA ? getPartyALoginEmail(proposal) : getPartyBLoginEmail(proposal)) ||
+    user.email ||
+    info.email ||
+    ''
+
+  const country =
+    contactItemValue(items, ['country']) ||
+    profile.country ||
+    info.country ||
+    (isA ? '' : proposal?.party_b_country) ||
+    ''
+
+  const completion = data?.completion
+  const profileComplete = completion?.profile_complete === true
+  const completionPct = profileComplete
+    ? 100
+    : completion?.completion_pct != null
+      ? Number(completion.completion_pct) || 0
+      : 0
+
+  return {
+    company,
+    contactPerson,
+    email,
+    country,
+    completionPct,
+    profileComplete,
+    hasProfileData: Boolean(data),
+    /** Show friendly banner when profile snapshot is missing or incomplete */
+    needsBanner: !data || !profileComplete,
+  }
+}
