@@ -77,8 +77,16 @@ export default function MmMatchingBoard({ adminOversight = false }) {
       const mId = res.match_id ?? res.match?.id
       setEngagementId(engId ?? null)
       setMatchId(mId ?? null)
-      setSuccess(res.message || `Match created — engagement #${engId}`)
-      if (res.party_b?.credentials) setPartyBCredentials(res.party_b.credentials)
+      const existing =
+        res.party_b?.existing_account && !(res.party_b?.account_created && res.party_b?.credentials)
+          ? 'Existing Party B account linked. They can use their current login.'
+          : ''
+      setSuccess(
+        [res.message || `Match created — engagement #${engId}`, existing].filter(Boolean).join(' · '),
+      )
+      if (res.party_b?.account_created && res.party_b?.credentials) {
+        setPartyBCredentials(res.party_b.credentials)
+      }
       await load()
     } catch (err) {
       setError(getErrorMessage(err))

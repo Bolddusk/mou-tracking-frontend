@@ -38,6 +38,7 @@ import { formatUpdateRequestLabel } from '../../utils/proposalDisplay'
 import { loadDraftFromProposal } from '../../utils/proposalDraft'
 import {
   buildCredentialPrompts,
+  getExistingAccountNotices,
   getPartyContactSaveFeedback,
   mergeProposalAfterPartyContacts,
 } from '../../utils/partyContactProvision'
@@ -116,6 +117,7 @@ export default function ProposalDetail() {
   const [fieldsEditorOpen, setFieldsEditorOpen] = useState(false)
   const [archiveModalOpen, setArchiveModalOpen] = useState(false)
   const [archiveReason, setArchiveReason] = useState('')
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [restoreModalOpen, setRestoreModalOpen] = useState(false)
   const [updateResponseEditOpen, setUpdateResponseEditOpen] = useState(false)
   const [promoteTargetId, setPromoteTargetId] = useState(null)
@@ -234,6 +236,7 @@ export default function ProposalDetail() {
   const isArchived = proposal?.is_archived === true
   const canArchiveProposal = Boolean(proposal?.capabilities?.can_archive_proposal)
   const canRestoreProposal = Boolean(proposal?.capabilities?.can_restore_proposal)
+  const canDeleteProposal = Boolean(proposal?.capabilities?.can_delete)
   const canEditFields =
     !isArchived && Boolean(proposal?.capabilities?.can_edit_fields)
   const canManagePartyContacts = canEditPartyContacts || isSuperAdmin
@@ -264,7 +267,13 @@ export default function ProposalDetail() {
         capabilities: res.capabilities || prev?.capabilities,
       }))
     }
-    setSuccess(res?.message || 'Proposal fields updated successfully')
+    const existingNotices = getExistingAccountNotices(res?.party_a, res?.party_b)
+    setSuccess(
+      [res?.message || 'Proposal fields updated successfully', ...existingNotices]
+        .filter(Boolean)
+        .join(' · '),
+    )
+    enqueueCredentialPrompts(buildCredentialPrompts(res?.party_a, res?.party_b))
     bumpChangeLogs()
     try {
       await refetchProgress()
@@ -282,6 +291,22 @@ export default function ProposalDetail() {
       setArchiveReason('')
       navigate(dashboardPath, {
         state: { success: res?.message || 'MOU archived successfully' },
+      })
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleDeleteProposal = async () => {
+    setActionLoading(true)
+    setError('')
+    try {
+      const res = await proposalsApi.deleteProposal(id)
+      setDeleteModalOpen(false)
+      navigate(dashboardPath, {
+        state: { success: res?.message || 'Proposal deleted' },
       })
     } catch (err) {
       setError(getErrorMessage(err))
@@ -903,6 +928,16 @@ export default function ProposalDetail() {
               Archive MOU
             </button>
           )}
+          {canDeleteProposal && (
+            <button
+              type="button"
+              onClick={() => setDeleteModalOpen(true)}
+              disabled={actionLoading}
+              className="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-60"
+            >
+              Delete
+            </button>
+          )}
         </div>
       </div>
 
@@ -1435,6 +1470,21 @@ export default function ProposalDetail() {
       </Modal>
 
       <Modal
+        open={deleteModalOpen}
+        title="Delete proposal?"
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleDeleteProposal}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        loading={actionLoading}
+      >
+        <p className="text-sm text-slate-600">
+          Permanently delete <strong>{getProposalDisplayTitle(proposal)}</strong>
+          {proposal?.status === 'rejected' ? ' (rejected)' : ' (draft)'}? This cannot be undone.
+        </p>
+      </Modal>
+
+      <Modal
         open={archiveModalOpen}
         title="Archive MOU"
         onClose={() => {
@@ -1483,6 +1533,7 @@ export default function ProposalDetail() {
         title={credentialModal?.title}
         credentials={credentialModal?.credentials}
         subtitle={credentialModal?.subtitle}
+        side={credentialModal?.side || 'B'}
         onClose={closeCredentialModal}
       />
     </div>

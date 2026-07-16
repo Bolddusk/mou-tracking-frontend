@@ -1,10 +1,20 @@
 import { useState } from 'react'
 import Modal from './Modal'
 
-export default function PartyBCredentialsModal({ open, credentials, title, subtitle, onClose }) {
+export default function PartyBCredentialsModal({
+  open,
+  credentials,
+  title,
+  subtitle,
+  side = 'B',
+  onClose,
+}) {
   const [copiedAll, setCopiedAll] = useState(false)
 
   if (!credentials) return null
+
+  const partyLabel = side === 'A' ? 'Party A' : 'Party B'
+  const modalTitle = title || `${partyLabel} login credentials`
 
   const copyAll = () => {
     const lines = [
@@ -13,7 +23,7 @@ export default function PartyBCredentialsModal({ open, credentials, title, subti
       `Login URL: ${credentials.login_url}`,
     ]
     if (credentials.must_change_password) {
-      lines.push('Note: Party B must change password on first login.')
+      lines.push(`Note: ${partyLabel} must change password on first login.`)
     }
     navigator.clipboard?.writeText(lines.join('\n'))
     setCopiedAll(true)
@@ -21,11 +31,11 @@ export default function PartyBCredentialsModal({ open, credentials, title, subti
   }
 
   return (
-    <Modal open={open} title={title || 'Party B login credentials'} onClose={onClose} hideFooter>
+    <Modal open={open} title={modalTitle} onClose={onClose} hideFooter>
       <div className="space-y-4 text-sm text-slate-700">
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
-          Share these credentials with Party B securely. Password is shown once — not stored in
-          plain text.
+          Share these credentials with {partyLabel} securely. Password is shown once — not stored
+          in plain text.
         </p>
         {subtitle && <p className="text-sm text-slate-600">{subtitle}</p>}
         <CredentialRow label="Email" value={credentials.email} copyable />
@@ -33,7 +43,7 @@ export default function PartyBCredentialsModal({ open, credentials, title, subti
         <CredentialRow label="Login URL" value={credentials.login_url} copyable />
         {credentials.must_change_password && (
           <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-900">
-            Party B must change this temporary password on first login.
+            {partyLabel} must change this temporary password on first login.
           </p>
         )}
         <button

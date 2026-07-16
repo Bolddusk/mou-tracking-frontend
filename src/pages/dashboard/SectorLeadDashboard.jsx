@@ -23,6 +23,7 @@ import {
 import {
   ActionGroup,
   ApproveIcon,
+  DeleteIcon,
   IconButton,
   RejectIcon,
   ViewIcon,
@@ -43,6 +44,10 @@ import {
   formatScopedSectorsDetail,
   getScopedSectors,
 } from '../../utils/scopedSectors'
+import {
+  getExistingAccountNotices,
+  shouldShowCredentialsModal,
+} from '../../utils/partyContactProvision'
 
 const DEFAULT_PAGE_LIMIT = 20
 
@@ -80,6 +85,8 @@ export default function SectorLeadDashboard() {
   const [partyBCredentials, setPartyBCredentials] = useState(null)
   const [partyBCredentialsSubtitle, setPartyBCredentialsSubtitle] = useState('')
   const [dashboardView, setDashboardView] = useState('opportunities')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchInput), 300)
@@ -265,6 +272,23 @@ export default function SectorLeadDashboard() {
 
   const handleView = (id) => navigate(`/proposals/${id}`)
 
+  const handleDeleteProposal = async () => {
+    if (!deleteTarget) return
+    setDeleteLoading(true)
+    setError('')
+    setSuccess('')
+    try {
+      const res = await proposalsApi.deleteProposal(deleteTarget.id)
+      setSuccess(res?.message || `Proposal #${deleteTarget.id} deleted`)
+      setDeleteTarget(null)
+      await Promise.all([load(), refreshFilterOptions()])
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   const openApprove = (p) => {
     setActionProposal(p)
     setActionType('approve')
@@ -295,13 +319,18 @@ export default function SectorLeadDashboard() {
     try {
       if (actionType === 'approve') {
         const res = await proposalsApi.approveProposal(actionProposal.id, comment.trim())
-        setSuccess(res.message || `Opportunity #${actionProposal.id} approved`)
-        if (res.party_b?.credentials) {
+        const existingNotices = getExistingAccountNotices(res.party_a, res.party_b)
+        setSuccess(
+          [res.message || `Opportunity #${actionProposal.id} approved`, ...existingNotices]
+            .filter(Boolean)
+            .join(' · '),
+        )
+        if (shouldShowCredentialsModal(res.party_b)) {
           setPartyBCredentials(res.party_b.credentials)
           setPartyBCredentialsSubtitle(
             res.party_b.email_sent
-              ? 'Credentials are also included here for your records.'
-              : 'Email was not sent — copy credentials below and share with Party B.',
+              ? 'Party B account created — credentials were also emailed.'
+              : 'Party B account created — share login credentials with Party B.',
           )
         }
       } else {
@@ -345,6 +374,15 @@ export default function SectorLeadDashboard() {
             <RejectIcon />
           </IconButton>
         </>
+      )}
+      {p.capabilities?.can_delete === true && (
+        <IconButton
+          variant="delete"
+          title={p.status === 'rejected' ? 'Delete rejected proposal' : 'Delete draft'}
+          onClick={() => setDeleteTarget(p)}
+        >
+          <DeleteIcon />
+        </IconButton>
       )}
     </ActionGroup>
   )
@@ -508,6 +546,22 @@ export default function SectorLeadDashboard() {
           }
           className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
         />
+      </Modal>
+
+      <Modal
+        open={Boolean(deleteTarget)}
+        title="Delete proposal?"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteProposal}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        loading={deleteLoading}
+      >
+        <p className="text-sm text-slate-600">
+          Permanently delete{' '}
+          <strong>{getProposalDisplayTitle(deleteTarget)}</strong>
+          {deleteTarget?.status === 'rejected' ? ' (rejected)' : ' (draft)'}? This cannot be undone.
+        </p>
       </Modal>
 
       <PartyBCredentialsModal

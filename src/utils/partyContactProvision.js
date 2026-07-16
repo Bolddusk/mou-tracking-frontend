@@ -18,10 +18,25 @@ export function mergeProposalAfterPartyContacts(prev, res) {
   }
 }
 
+/** New account only — never open modal when existing_account or credentials missing. */
+export function shouldShowCredentialsModal(party) {
+  return Boolean(party?.account_created && party?.credentials)
+}
+
+export function getExistingAccountMessage(side = 'A') {
+  const label = side === 'B' ? 'Party B' : 'Party A'
+  return `Existing ${label} account linked. They can use their current login.`
+}
+
+/**
+ * Credentials modal prompts for newly created accounts only.
+ * Existing-account toasts are returned via getPartyLinkNotices().
+ */
 export function buildCredentialPrompts(partyA, partyB) {
   const prompts = []
-  if (partyA?.credentials) {
+  if (shouldShowCredentialsModal(partyA)) {
     prompts.push({
+      side: 'A',
       title: 'Party A login credentials',
       credentials: partyA.credentials,
       subtitle: partyA.email_sent
@@ -29,8 +44,9 @@ export function buildCredentialPrompts(partyA, partyB) {
         : 'Party A account created — share login credentials with Party A.',
     })
   }
-  if (partyB?.credentials) {
+  if (shouldShowCredentialsModal(partyB)) {
     prompts.push({
+      side: 'B',
       title: 'Party B login credentials',
       credentials: partyB.credentials,
       subtitle: partyB.email_sent
@@ -41,21 +57,49 @@ export function buildCredentialPrompts(partyA, partyB) {
   return prompts
 }
 
+/** Soft success lines when an existing account was linked (no new password). */
+export function getExistingAccountNotices(partyA, partyB) {
+  const notices = []
+  if (partyA?.existing_account && !shouldShowCredentialsModal(partyA)) {
+    notices.push(getExistingAccountMessage('A'))
+  }
+  if (partyB?.existing_account && !shouldShowCredentialsModal(partyB)) {
+    notices.push(getExistingAccountMessage('B'))
+  }
+  return notices
+}
+
 export function getPartyContactSaveFeedback(res) {
   const errors = []
   const extras = []
   const pa = res.party_a
+  const pb = res.party_b
 
   if (pa?.skipped && pa.reason === 'email_belongs_to_non_party_a_user') {
     errors.push('This email belongs to another role. Use a different Party A email.')
+  } else if (pa?.existing_account) {
+    extras.push(getExistingAccountMessage('A'))
+  } else if (pa?.account_created) {
+    extras.push(
+      pa.email_sent
+        ? 'Party A account created — invite emailed'
+        : 'Party A account created — share login credentials',
+    )
   } else if (pa?.linked && pa.email_sent) {
     extras.push('Party A invite email sent')
   } else if (pa?.linked) {
     extras.push('Party A account linked')
   }
 
-  const pb = res.party_b
-  if (pb?.linked && pb.email_sent && !pb.credentials) {
+  if (pb?.existing_account) {
+    extras.push(getExistingAccountMessage('B'))
+  } else if (pb?.account_created) {
+    extras.push(
+      pb.email_sent
+        ? 'Party B account created — invite emailed'
+        : 'Party B account created — share login credentials',
+    )
+  } else if (pb?.linked && pb.email_sent && !pb.credentials) {
     extras.push('Party B invite email sent')
   } else if (pb?.linked && !pb.credentials) {
     extras.push('Party B account linked')
@@ -63,9 +107,7 @@ export function getPartyContactSaveFeedback(res) {
 
   const base = res.message || 'Party contact details updated successfully'
   const success =
-    errors.length === 0
-      ? [base, ...extras].filter(Boolean).join(' · ')
-      : base
+    errors.length === 0 ? [base, ...extras].filter(Boolean).join(' · ') : base
 
   return { success, errors }
 }

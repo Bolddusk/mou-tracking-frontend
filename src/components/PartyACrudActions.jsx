@@ -1,12 +1,13 @@
 import { ActionGroup, DeleteIcon, EditIcon, IconButton, ViewIcon } from './ActionIcons'
 
 const CAN_EDIT = new Set(['draft', 'rejected'])
-const CAN_DELETE = new Set(['draft', 'rejected'])
 
 export default function PartyACrudActions({ proposal, onView, onUpdate, onDelete }) {
   const status = (proposal.status || '').toLowerCase()
   const canEdit = CAN_EDIT.has(status)
-  const canDelete = CAN_DELETE.has(status)
+  const canDelete =
+    proposal?.capabilities?.can_delete === true ||
+    (proposal?.capabilities?.can_delete == null && CAN_EDIT.has(status))
 
   return (
     <ActionGroup>
@@ -27,18 +28,15 @@ export default function PartyACrudActions({ proposal, onView, onUpdate, onDelete
       >
         <EditIcon />
       </IconButton>
-      <IconButton
-        variant="delete"
-        title={
-          canDelete
-            ? 'Delete — remove opportunity'
-            : 'Delete disabled — submitted/approved cannot be deleted'
-        }
-        disabled={!canDelete}
-        onClick={() => canDelete && onDelete(proposal)}
-      >
-        <DeleteIcon />
-      </IconButton>
+      {canDelete && (
+        <IconButton
+          variant="delete"
+          title="Delete — remove draft or rejected opportunity"
+          onClick={() => onDelete(proposal)}
+        >
+          <DeleteIcon />
+        </IconButton>
+      )}
     </ActionGroup>
   )
 }
