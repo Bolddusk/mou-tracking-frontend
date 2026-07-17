@@ -1,7 +1,5 @@
 import { useAuth } from '../../context/AuthContext'
-import {
-  getPartyCardSkeletonFields,
-} from '../../utils/proposalDisplay'
+import { getPartyCardSkeletonFields } from '../../utils/proposalDisplay'
 import { getPartyAProfilePaths, getPartyBProfilePaths } from '../../constants/profileRoutes'
 import PartyProfileSnapshotCard, {
   PARTY_A_MANDATORY,
@@ -9,7 +7,25 @@ import PartyProfileSnapshotCard, {
   PROFILE_BANNER,
 } from './PartyProfileSnapshotCard'
 
-export default function ProposalMouPartyCards({ proposal, onEditContacts, canEditContacts }) {
+function EditContactsButton({ onClick, label = 'Edit contacts' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-lg bg-portal-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-portal-primary-hover"
+    >
+      {label}
+    </button>
+  )
+}
+
+export default function ProposalMouPartyCards({
+  proposal,
+  canEditPartyAContacts = false,
+  canEditPartyBContacts = false,
+  onEditPartyAContacts,
+  onEditPartyBContacts,
+}) {
   const { user } = useAuth()
   const partyAPaths = getPartyAProfilePaths(user?.role)
   const partyBPaths = getPartyBProfilePaths(user?.role)
@@ -25,15 +41,29 @@ export default function ProposalMouPartyCards({ proposal, onEditContacts, canEdi
     proposal?.party_b_profile?.data?.user?.id ||
     (proposal?.party_b_profile?.linked ? proposal?.party_b_user_id : null)
 
-  const editButton =
-    canEditContacts && onEditContacts ? (
-      <button
-        type="button"
-        onClick={onEditContacts}
-        className="rounded-lg bg-portal-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-portal-primary-hover"
-      >
-        Edit contacts
-      </button>
+  const editPartyA =
+    canEditPartyAContacts && onEditPartyAContacts ? (
+      <EditContactsButton onClick={onEditPartyAContacts} />
+    ) : null
+
+  const editPartyB =
+    canEditPartyBContacts && onEditPartyBContacts ? (
+      <EditContactsButton onClick={onEditPartyBContacts} />
+    ) : null
+
+  const bannerEdit =
+    editPartyA || editPartyB ? (
+      <EditContactsButton
+        onClick={() => {
+          if (canEditPartyAContacts) onEditPartyAContacts?.()
+          else onEditPartyBContacts?.()
+        }}
+        label={
+          canEditPartyAContacts && !canEditPartyBContacts
+            ? 'Edit my contacts'
+            : 'Edit contacts'
+        }
+      />
     ) : null
 
   return (
@@ -41,7 +71,7 @@ export default function ProposalMouPartyCards({ proposal, onEditContacts, canEdi
       {showSharedBanner && (
         <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-amber-900">{PROFILE_BANNER}</p>
-          {editButton}
+          {bannerEdit}
         </div>
       )}
 
@@ -57,7 +87,7 @@ export default function ProposalMouPartyCards({ proposal, onEditContacts, canEdi
               ? partyAPaths.detail(partyAViewId)
               : null
           }
-          editContactsAction={editButton}
+          editContactsAction={editPartyA}
         />
         <PartyProfileSnapshotCard
           title="Chinese Company"
@@ -70,7 +100,7 @@ export default function ProposalMouPartyCards({ proposal, onEditContacts, canEdi
               ? partyBPaths.detail(partyBViewId)
               : null
           }
-          editContactsAction={editButton}
+          editContactsAction={editPartyB}
         />
       </div>
     </div>

@@ -143,10 +143,14 @@ function PartyContactFields({ info, onChange }) {
   )
 }
 
+/**
+ * @param {'a' | 'b' | 'both'} editSides — which sides to show and include in PATCH
+ */
 export default function ProposalPartyContactsEditor({
   open,
   proposalId,
   proposal,
+  editSides = 'both',
   onClose,
   onSaved,
 }) {
@@ -154,12 +158,15 @@ export default function ProposalPartyContactsEditor({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  const showPartyA = editSides === 'both' || editSides === 'a'
+  const showPartyB = editSides === 'both' || editSides === 'b'
+
   useEffect(() => {
     if (open && proposal) {
       setForm(partyContactsFormFromProposal(proposal))
       setError('')
     }
-  }, [open, proposal])
+  }, [open, proposal, editSides])
 
   const setPartyA = (key, value) => {
     setForm((prev) => ({
@@ -179,10 +186,9 @@ export default function ProposalPartyContactsEditor({
     setSaving(true)
     setError('')
     try {
-      const body = {
-        party_a_info: { ...form.party_a_info },
-        party_b_info: { ...form.party_b_info },
-      }
+      const body = {}
+      if (showPartyA) body.party_a_info = { ...form.party_a_info }
+      if (showPartyB) body.party_b_info = { ...form.party_b_info }
       const res = await proposalsApi.patchProposalPartyContacts(proposalId, body)
       onSaved?.(res)
       onClose?.()
@@ -193,33 +199,47 @@ export default function ProposalPartyContactsEditor({
     }
   }
 
+  const title =
+    showPartyA && showPartyB
+      ? 'Edit Party A & Party B contacts'
+      : showPartyA
+        ? 'Edit Party A contacts'
+        : 'Edit Party B contacts'
+
   return (
     <Modal
       open={open}
-      title="Edit Party A & Party B contacts"
+      title={title}
       onClose={onClose}
       onConfirm={handleSave}
       confirmLabel="Save changes"
       loading={saving}
-      panelClassName="max-h-[90vh] max-w-4xl overflow-y-auto"
+      panelClassName={`max-h-[90vh] overflow-y-auto ${showPartyA && showPartyB ? 'max-w-4xl' : 'max-w-xl'}`}
     >
       <Alert type="error" message={error} onClose={() => setError('')} />
 
       <p className="mb-4 text-sm text-slate-600">
-        Both parties use the same contact fields. Saving links or creates portal logins when the
-        proposal is approved. Emails are stored as lowercase login addresses.
+        {showPartyA && !showPartyB
+          ? 'Update your Pakistani company contacts. Use a valid login email (e.g. name@domain.com — no extra characters).'
+          : showPartyB && !showPartyA
+            ? 'Update your Chinese company contacts. Use a valid login email (e.g. name@domain.com — no extra characters).'
+            : 'Saving links or creates portal logins when appropriate. Emails are stored as lowercase login addresses.'}
       </p>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-          <legend className="px-1 text-sm font-semibold text-slate-800">Party A (Pakistan)</legend>
-          <PartyContactFields info={form.party_a_info} onChange={setPartyA} />
-        </fieldset>
+      <div className={`grid gap-6 ${showPartyA && showPartyB ? 'lg:grid-cols-2' : ''}`}>
+        {showPartyA && (
+          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <legend className="px-1 text-sm font-semibold text-slate-800">Party A (Pakistan)</legend>
+            <PartyContactFields info={form.party_a_info} onChange={setPartyA} />
+          </fieldset>
+        )}
 
-        <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-          <legend className="px-1 text-sm font-semibold text-slate-800">Party B (China)</legend>
-          <PartyContactFields info={form.party_b_info} onChange={setPartyB} />
-        </fieldset>
+        {showPartyB && (
+          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <legend className="px-1 text-sm font-semibold text-slate-800">Party B (China)</legend>
+            <PartyContactFields info={form.party_b_info} onChange={setPartyB} />
+          </fieldset>
+        )}
       </div>
     </Modal>
   )

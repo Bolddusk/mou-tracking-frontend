@@ -30,7 +30,7 @@ import { useAuth } from '../../context/AuthContext'
 import { getEngagementLabel, getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { getPakistaniCompanyDisplay } from '../../utils/proposalDisplay'
 import MouProgressValue from '../../components/proposal/MouProgressValue'
-import { getMouConferenceRow } from '../../utils/mouConferenceFields'
+import { getMouConferenceRow, parseExecutiveSummary } from '../../utils/mouConferenceFields'
 import { isMatchMouReady } from '../../constants/matchmaking'
 import { ROLES } from '../../constants/sectors'
 import { formatDate, getErrorMessage } from '../../utils/format'
@@ -114,6 +114,7 @@ export default function ProposalDetail() {
   const [mmMatch, setMmMatch] = useState(null)
   const [mouStatus, setMouStatus] = useState(null)
   const [contactsEditorOpen, setContactsEditorOpen] = useState(false)
+  const [contactsEditSides, setContactsEditSides] = useState('both')
   const [fieldsEditorOpen, setFieldsEditorOpen] = useState(false)
   const [archiveModalOpen, setArchiveModalOpen] = useState(false)
   const [archiveReason, setArchiveReason] = useState('')
@@ -232,17 +233,32 @@ export default function ProposalDetail() {
 
   const canMarkSigned = canEditMouFields && !isDealClosed
 
-  const canEditPartyContacts = Boolean(proposal?.capabilities?.can_edit_party_contacts)
+  const caps = proposal?.capabilities || {}
   const isArchived = proposal?.is_archived === true
-  const canArchiveProposal = Boolean(proposal?.capabilities?.can_archive_proposal)
-  const canRestoreProposal = Boolean(proposal?.capabilities?.can_restore_proposal)
-  const canDeleteProposal = Boolean(proposal?.capabilities?.can_delete)
-  const canEditFields =
-    !isArchived && Boolean(proposal?.capabilities?.can_edit_fields)
-  const canManagePartyContacts = canEditPartyContacts || isSuperAdmin
-  const canViewCompanies = isSuperAdmin || isSectorLead
+  const canArchiveProposal = Boolean(caps.can_archive_proposal)
+  const canRestoreProposal = Boolean(caps.can_restore_proposal)
+  const canDeleteProposal = Boolean(caps.can_delete)
+  const canEditFields = !isArchived && Boolean(caps.can_edit_fields)
+  // Split contact flags — do not use legacy can_edit_party_contacts for parties
+  const canViewCompanies = caps.can_view_companies === true
+  const canEditPartyAContacts = caps.can_edit_party_a_contacts === true
+  const canEditPartyBContacts = caps.can_edit_party_b_contacts === true
 
   const openFieldsEditor = () => setFieldsEditorOpen(true)
+
+  const openContactsEditor = (sides) => {
+    setContactsEditSides(sides)
+    setContactsEditorOpen(true)
+  }
+
+  /** Staff (both flags): edit both sides. Party A/B: only their own side in PATCH. */
+  const openContactsEditorForCard = (side) => {
+    if (canEditPartyAContacts && canEditPartyBContacts) {
+      openContactsEditor('both')
+      return
+    }
+    openContactsEditor(side)
+  }
 
   const bumpChangeLogs = () => setChangeLogRefreshKey((k) => k + 1)
 
@@ -660,6 +676,24 @@ export default function ProposalDetail() {
     await Promise.all([refetchProgress(), refetchProposal()])
   }, [refetchProgress, refetchProposal])
 
+  const applyMouFieldsSync = useCallback((mouFields) => {
+    if (!mouFields || typeof mouFields !== 'object' || !Object.keys(mouFields).length) {
+      return false
+    }
+    setProposal((prev) => {
+      if (!prev) return prev
+      const es = parseExecutiveSummary(prev)
+      return {
+        ...prev,
+        executive_summary: {
+          ...es,
+          ...mouFields,
+        },
+      }
+    })
+    return true
+  }, [])
+
   const handleAddActivity = async () => {
     if (!activityForm.title.trim()) return
     setActionLoading(true)
@@ -734,10 +768,20 @@ export default function ProposalDetail() {
     setActionLoading(true)
     setError('')
     try {
-      await activitiesApi.deleteActivity(progressDeleteTarget.id)
+      const res = await activitiesApi.deleteActivity(progressDeleteTarget.id)
       setProgressDeleteTarget(null)
-      setSuccess('Progress entry deleted')
-      await refreshProgressAndProposal()
+      const synced = applyMouFieldsSync(res?.mou_sync?.mou_fields)
+      setSuccess(
+        synced || res?.mou_sync?.synced
+          ? 'Progress entry deleted — MOU Details updated'
+          : 'Progress entry deleted',
+      )
+      if (synced) {
+        await refetchProgress()
+      } else {
+        await refreshProgressAndProposal()
+      }
+      bumpChangeLogs()
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -1146,8 +1190,10 @@ export default function ProposalDetail() {
           {proposal && (
             <ProposalMouPartyCards
               proposal={proposal}
-              canEditContacts={canManagePartyContacts}
-              onEditContacts={() => setContactsEditorOpen(true)}
+              canEditPartyAContacts={canEditPartyAContacts}
+              canEditPartyBContacts={canEditPartyBContacts}
+              onEditPartyAContacts={() => openContactsEditorForCard('a')}
+              onEditPartyBContacts={() => openContactsEditorForCard('b')}
             />
           )}
         </div>
@@ -1349,6 +1395,7 @@ export default function ProposalDetail() {
         open={contactsEditorOpen}
         proposalId={Number(id)}
         proposal={proposal}
+        editSides={contactsEditSides}
         onClose={() => setContactsEditorOpen(false)}
         onSaved={handlePartyContactsSaved}
       />

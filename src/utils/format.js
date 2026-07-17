@@ -116,6 +116,9 @@ export function getErrorMessage(err) {
   if (data?.code === 'party_a_email_missing' && data?.error) {
     return data.error
   }
+  if (data?.error && /invalid.*email|email address/i.test(String(data.error))) {
+    return data.error
+  }
   return data?.error || err?.message || 'Something went wrong'
 }
 
