@@ -225,10 +225,11 @@ export default function ProposalMouFieldsEditor({
             <label className="block">
               <FieldLabel>Status</FieldLabel>
               <select
-                value={form.executive_summary.mou_operational_status || operationalStatuses[0]}
+                value={form.executive_summary.mou_operational_status || ''}
                 onChange={(e) => setEs('mou_operational_status', e.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
               >
+                <option value="">Select status…</option>
                 {operationalStatuses.map((status) => (
                   <option key={status} value={status}>
                     {status}

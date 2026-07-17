@@ -43,6 +43,7 @@ import {
   mergeProposalAfterPartyContacts,
 } from '../../utils/partyContactProvision'
 import { normalizeProgressListResponse } from '../../utils/progressUpdates'
+import { mergeProposalAfterFieldsPatch } from '../../utils/proposalFieldsPatch'
 
 const EMPTY_PROGRESS = Object.freeze({
   updates: [],
@@ -276,12 +277,8 @@ export default function ProposalDetail() {
   }, [id])
 
   const handleFieldsSaved = async (res) => {
-    if (res?.proposal) {
-      setProposal((prev) => ({
-        ...prev,
-        ...res.proposal,
-        capabilities: res.capabilities || prev?.capabilities,
-      }))
+    if (res?.proposal || res?.capabilities) {
+      setProposal((prev) => mergeProposalAfterFieldsPatch(prev, res))
     }
     const existingNotices = getExistingAccountNotices(res?.party_a, res?.party_b)
     setSuccess(
@@ -292,7 +289,8 @@ export default function ProposalDetail() {
     enqueueCredentialPrompts(buildCredentialPrompts(res?.party_a, res?.party_b))
     bumpChangeLogs()
     try {
-      await refetchProgress()
+      // Refetch full proposal so Progress / SIFC / Location stay server-truth after partial PATCH
+      await Promise.all([refetchProgress(), refetchProposal()])
     } catch {
       // non-blocking — main save already succeeded
     }

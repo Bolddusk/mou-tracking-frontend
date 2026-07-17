@@ -1,6 +1,10 @@
 import { parseExecutiveSummary } from './mouConferenceFields'
 
-/** Progress is updated via Progress tab only — not Edit MOU fields. */
+/**
+ * Progress is Progress-tab only — never include in Edit MOU fields form/patch.
+ * Only send *changed* keys; blank values for untouched fields must not be in the body
+ * (they can overwrite existing server data).
+ */
 const EXECUTIVE_SUMMARY_FORM_KEYS = [
   'sifc_category',
   'mou_operational_status',
@@ -75,9 +79,34 @@ export function buildProposalFieldsPatch(
       esPatch[key] = after
     }
   }
+  // Defensive: never PATCH progress from this form
+  delete esPatch.progress
   if (Object.keys(esPatch).length) {
     patch.executive_summary = esPatch
   }
 
   return patch
+}
+
+/** Merge fields PATCH response without wiping nested executive_summary keys. */
+export function mergeProposalAfterFieldsPatch(prev, res) {
+  if (!prev) return res?.proposal || prev
+  if (!res?.proposal) {
+    return res?.capabilities ? { ...prev, capabilities: res.capabilities } : prev
+  }
+
+  const next = {
+    ...prev,
+    ...res.proposal,
+    capabilities: res.capabilities || prev.capabilities,
+  }
+
+  if (res.proposal.executive_summary != null) {
+    next.executive_summary = {
+      ...parseExecutiveSummary(prev),
+      ...parseExecutiveSummary(res.proposal),
+    }
+  }
+
+  return next
 }
