@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import * as proposalsApi from '../../api/proposals'
 import Alert from '../../components/Alert'
@@ -10,6 +10,7 @@ import ProposalConferenceMouTable from '../../components/proposals/ProposalConfe
 import MouChangeLogsPanel from '../../components/proposals/MouChangeLogsPanel'
 import OpportunitiesDashboardTabs from '../../components/proposals/OpportunitiesDashboardTabs'
 import ProposalOpportunitiesToolbar from '../../components/proposals/ProposalOpportunitiesToolbar'
+import ComplaintsList from '../complaints/ComplaintsList'
 import {
   buildCooperationModeFilters,
   buildDashboardListTabFilters,
@@ -59,8 +60,15 @@ const EMPTY_ADVANCED_FILTERS = {
   dateTo: '',
 }
 
+const DASHBOARD_VIEWS = new Set(['opportunities', 'change-logs', 'complaints'])
+
+function resolveDashboardView(param) {
+  return DASHBOARD_VIEWS.has(param) ? param : 'opportunities'
+}
+
 export default function SectorLeadDashboard() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user, rbac } = useAuth()
   const profilePaths = getPartyAProfilePaths(user?.role)
 
@@ -85,9 +93,23 @@ export default function SectorLeadDashboard() {
   const [actionLoading, setActionLoading] = useState(false)
   const [partyBCredentials, setPartyBCredentials] = useState(null)
   const [partyBCredentialsSubtitle, setPartyBCredentialsSubtitle] = useState('')
-  const [dashboardView, setDashboardView] = useState('opportunities')
+  const [dashboardView, setDashboardView] = useState(() =>
+    resolveDashboardView(searchParams.get('view')),
+  )
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+
+  useEffect(() => {
+    setDashboardView(resolveDashboardView(searchParams.get('view')))
+  }, [searchParams])
+
+  const handleDashboardViewChange = (id) => {
+    setDashboardView(id)
+    const next = new URLSearchParams(searchParams)
+    if (id === 'opportunities') next.delete('view')
+    else next.set('view', id)
+    setSearchParams(next, { replace: true })
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchInput), 300)
@@ -442,10 +464,14 @@ export default function SectorLeadDashboard() {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <OpportunitiesDashboardTabs active={dashboardView} onChange={setDashboardView} />
+        <OpportunitiesDashboardTabs active={dashboardView} onChange={handleDashboardViewChange} />
 
         {dashboardView === 'change-logs' ? (
           <MouChangeLogsPanel />
+        ) : dashboardView === 'complaints' ? (
+          <div className="p-4 sm:p-5">
+            <ComplaintsList embedded />
+          </div>
         ) : (
           <>
         <ProposalOpportunitiesToolbar
@@ -480,6 +506,7 @@ export default function SectorLeadDashboard() {
           onClearAll={clearAllFilters}
           hasActiveFilters={hasActiveFilters || listTabFilter !== 'all'}
           reportFilters={reportFilters}
+          showSifcReportActions
           onReportError={setError}
         />
 

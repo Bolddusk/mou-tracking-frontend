@@ -73,13 +73,16 @@ export const SIDEBAR_PERMISSION_SECTIONS = [
     ],
   },
   {
+    // Kept for Permissions Admin / route access; UI lives on dashboard Complaints tab.
     section: 'COMPLAINTS',
+    hideInNav: true,
     permissions: [
       {
         key: 'nav.complaints.all',
         navKey: 'complaints_all',
         label: 'All Complaints',
         path: '/complaints',
+        hideInNav: true,
       },
     ],
   },

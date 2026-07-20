@@ -1,28 +1,49 @@
 export function canRfpActOnComplaint(complaint, userId) {
   return (
-    complaint?.status === 'forwarded' && complaint?.forwarded_to === userId
+    complaint?.status === 'forwarded' &&
+    Number(complaint?.forwarded_to) === Number(userId)
   )
 }
 
 export function canSectorLeadActOnComplaint(complaint, userId) {
   return (
-    complaint?.tagged_sector_lead === userId &&
-    complaint?.status !== 'forwarded' &&
-    ['open', 'under_review', 'returned_to_sector_lead'].includes(complaint?.status)
+    Number(complaint?.tagged_sector_lead) === Number(userId) &&
+    ['open', 'under_review', 'escalated'].includes(complaint?.status)
   )
 }
 
 export function canSuperAdminActOnComplaint(complaint) {
-  return ['open', 'under_review', 'returned_to_sector_lead'].includes(complaint?.status)
+  return ['open', 'under_review', 'escalated'].includes(complaint?.status)
 }
 
-export function canPostInternalTimeline(complaint) {
-  return ['forwarded', 'returned_to_sector_lead'].includes(complaint?.status)
-}
+/** Prefer API capabilities when present; else fall back to role helpers. */
+export function getComplaintActionFlags(
+  complaint,
+  { userId, isSectorLead, isSuperAdmin, isRegionalFocalPoint },
+) {
+  const caps = complaint?.capabilities
+  if (caps && typeof caps === 'object') {
+    return {
+      canApprove: caps.can_approve === true,
+      canReject: caps.can_reject === true,
+      canComment: caps.can_comment === true,
+      canEscalate: caps.can_escalate === true,
+      canReopen: caps.can_reopen === true,
+      canForward: false,
+    }
+  }
 
-export function canSectorLeadForward(complaint, userId) {
-  return (
-    complaint?.tagged_sector_lead === userId &&
-    ['open', 'under_review', 'returned_to_sector_lead'].includes(complaint?.status)
-  )
+  const canReview =
+    (isSectorLead && canSectorLeadActOnComplaint(complaint, userId)) ||
+    (isRegionalFocalPoint && canRfpActOnComplaint(complaint, userId)) ||
+    (isSuperAdmin && canSuperAdminActOnComplaint(complaint))
+
+  return {
+    canApprove: canReview,
+    canReject: canReview,
+    canComment: Boolean(complaint) && (isSectorLead || isSuperAdmin),
+    canEscalate: canReview || Boolean(complaint),
+    canReopen: complaint?.status === 'rejected',
+    canForward: false,
+  }
 }

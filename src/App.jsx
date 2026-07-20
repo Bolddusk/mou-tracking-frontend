@@ -293,6 +293,7 @@ export default function App() {
               />
             }
           >
+            <Route path="/reports/conference" element={<ConferenceReportPage />} />
             <Route path="/reports/conference/:conferenceKey" element={<ConferenceReportPage />} />
           </Route>
 

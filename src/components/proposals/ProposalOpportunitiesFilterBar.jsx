@@ -65,6 +65,8 @@ export default function ProposalOpportunitiesFilterBar({
   /** Same Opportunities filters as the table (minus page/limit) — applied to Preview/PDF/Excel */
   reportFilters = {},
   onReportError,
+  /** SA / Admin / SL — show SIFC buttons for All conferences and specific */
+  showSifcReportActions = false,
 }) {
   return (
     <div className="border-b border-slate-100 bg-green-50/40 px-4 py-4 sm:px-6">
@@ -84,10 +86,10 @@ export default function ProposalOpportunitiesFilterBar({
               </option>
             ))}
           </FilterSelect>
-          {selectedConference?.supports_report && (
+          {showSifcReportActions && (
             <ConferenceReportActions
-              conferenceKey={selectedConference.key}
-              conferenceName={selectedConference.name}
+              conferenceKey={selectedConference?.key || conferenceKey || ''}
+              conferenceName={selectedConference?.name || ''}
               reportFilters={reportFilters}
               onError={onReportError}
             />

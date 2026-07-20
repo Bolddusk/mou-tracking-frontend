@@ -90,6 +90,8 @@ export function buildSidebarNavigation(rbac) {
   const sections = []
 
   for (const section of SIDEBAR_PERMISSION_SECTIONS) {
+    if (section.hideInNav) continue
+
     if (section.section === 'ADMINISTRATION') {
       const firstTab = ADMIN_SETTINGS_TABS.find((tab) => canAny(rbac, tab.permissions))
       if (firstTab) {

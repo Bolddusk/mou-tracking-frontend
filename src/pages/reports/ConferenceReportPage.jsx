@@ -49,11 +49,11 @@ export default function ConferenceReportPage() {
   }, [searchParams])
 
   const load = useCallback(async () => {
-    if (!conferenceKey || !canAccess) return
+    if (!canAccess) return
     setLoading(true)
     setError('')
     try {
-      const data = await proposalsApi.getConferenceReport(conferenceKey, reportFilters)
+      const data = await proposalsApi.getConferenceReport(conferenceKey || null, reportFilters)
       setReport(data)
     } catch (err) {
       setReport(null)
@@ -70,11 +70,10 @@ export default function ConferenceReportPage() {
   const handlePrint = () => window.print()
 
   const handlePdf = async () => {
-    if (!conferenceKey) return
     setPdfLoading(true)
     setError('')
     try {
-      await proposalsApi.downloadConferenceReportPdf(conferenceKey, reportFilters)
+      await proposalsApi.downloadConferenceReportPdf(conferenceKey || null, reportFilters)
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -83,11 +82,10 @@ export default function ConferenceReportPage() {
   }
 
   const handleXlsx = async () => {
-    if (!conferenceKey) return
     setXlsxLoading(true)
     setError('')
     try {
-      await proposalsApi.downloadConferenceReportXlsx(conferenceKey, reportFilters)
+      await proposalsApi.downloadConferenceReportXlsx(conferenceKey || null, reportFilters)
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -126,7 +124,9 @@ export default function ConferenceReportPage() {
                 {report?.scope?.filters_applied ? ' · filtered' : ''}
               </p>
               <p className="text-sm font-semibold text-slate-900">
-                {report?.conference?.name || conferenceKey}
+                {report?.conference?.name ||
+                  report?.conference?.report_title ||
+                  (conferenceKey ? conferenceKey : 'All conferences')}
                 {report?.proposal_count != null ? ` · ${report.proposal_count} MOUs` : ''}
               </p>
             </div>

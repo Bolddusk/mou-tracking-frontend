@@ -2,6 +2,7 @@ export default function OpportunitiesDashboardTabs({ active, onChange }) {
   const tabs = [
     { id: 'opportunities', label: 'Opportunities' },
     { id: 'change-logs', label: 'Change Logs' },
+    { id: 'complaints', label: 'Complaints' },
   ]
 
   return (

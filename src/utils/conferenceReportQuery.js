@@ -26,7 +26,11 @@ export function buildConferenceReportParams({
   ...filters
 } = {}) {
   const params = {}
-  if (conference_key) params.conference_key = conference_key
+  const confKey = conference_key != null ? String(conference_key).trim() : ''
+  // Omit empty / "all" — All conferences report has no conference_key
+  if (confKey && confKey.toLowerCase() !== 'all') {
+    params.conference_key = confKey
+  }
   if (format) params.format = format
   if (download != null && download !== '' && download !== false) {
     params.download = download === true ? 1 : download

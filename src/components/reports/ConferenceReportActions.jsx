@@ -5,19 +5,24 @@ import { getErrorMessage } from '../../utils/format'
 import { buildSifcReportQuery } from '../../utils/conferenceReportQuery'
 
 export default function ConferenceReportActions({
-  conferenceKey,
-  conferenceName,
+  conferenceKey = '',
+  conferenceName = '',
   reportFilters = {},
   onError,
 }) {
   const [pdfLoading, setPdfLoading] = useState(false)
   const [xlsxLoading, setXlsxLoading] = useState(false)
 
-  const previewSearch = useMemo(() => {
-    // Preview page loads JSON; pass the same Opportunities filters in the URL
+  const key = conferenceKey?.trim() || ''
+  const isAllConferences = !key
+
+  const previewTo = useMemo(() => {
     const qs = buildSifcReportQuery({ ...reportFilters })
-    return qs ? `?${qs}` : ''
-  }, [reportFilters])
+    const base = key
+      ? `/reports/conference/${encodeURIComponent(key)}`
+      : '/reports/conference'
+    return qs ? `${base}?${qs}` : base
+  }, [key, reportFilters])
 
   const filterHint = useMemo(() => {
     const keys = Object.keys(reportFilters || {}).filter((k) => {
@@ -27,12 +32,10 @@ export default function ConferenceReportActions({
     return keys.length > 0
   }, [reportFilters])
 
-  if (!conferenceKey) return null
-
   const handlePdf = async () => {
     setPdfLoading(true)
     try {
-      await proposalsApi.downloadConferenceReportPdf(conferenceKey, reportFilters)
+      await proposalsApi.downloadConferenceReportPdf(key || null, reportFilters)
     } catch (err) {
       onError?.(getErrorMessage(err))
     } finally {
@@ -43,7 +46,7 @@ export default function ConferenceReportActions({
   const handleXlsx = async () => {
     setXlsxLoading(true)
     try {
-      await proposalsApi.downloadConferenceReportXlsx(conferenceKey, reportFilters)
+      await proposalsApi.downloadConferenceReportXlsx(key || null, reportFilters)
     } catch (err) {
       onError?.(getErrorMessage(err))
     } finally {
@@ -52,11 +55,12 @@ export default function ConferenceReportActions({
   }
 
   const busy = pdfLoading || xlsxLoading
+  const scopeLabel = isAllConferences ? 'All conferences' : conferenceName || key
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
       <Link
-        to={`/reports/conference/${encodeURIComponent(conferenceKey)}${previewSearch}`}
+        to={previewTo}
         className="inline-flex items-center rounded-lg bg-green-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-900"
       >
         Preview SIFC report
@@ -77,12 +81,10 @@ export default function ConferenceReportActions({
       >
         {xlsxLoading ? 'Preparing Excel…' : 'Download SIFC report (Excel)'}
       </button>
-      {conferenceName && (
-        <span className="text-[11px] text-slate-500">
-          Report for {conferenceName}
-          {filterHint ? ' (matches table filters)' : ''}
-        </span>
-      )}
+      <span className="text-[11px] text-slate-500">
+        Report for {scopeLabel}
+        {filterHint ? ' (matches table filters)' : ''}
+      </span>
     </div>
   )
 }

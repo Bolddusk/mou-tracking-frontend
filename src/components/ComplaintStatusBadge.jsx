@@ -1,6 +1,7 @@
 const STATUS_STYLES = {
   open: 'bg-blue-100 text-blue-800 border-blue-200',
   under_review: 'bg-amber-100 text-amber-800 border-amber-200',
+  escalated: 'bg-violet-100 text-violet-900 border-violet-200',
   resolved: 'bg-green-100 text-green-800 border-green-200',
   rejected: 'bg-red-100 text-red-800 border-red-200',
   forwarded: 'bg-purple-100 text-purple-800 border-purple-200',
@@ -10,6 +11,7 @@ const STATUS_STYLES = {
 const STATUS_LABELS = {
   open: 'Open',
   under_review: 'Under Review',
+  escalated: 'Escalated',
   resolved: 'Resolved',
   rejected: 'Rejected',
   forwarded: 'Forwarded',

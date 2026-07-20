@@ -22,11 +22,27 @@
 GET /api/proposals/conference-report
 ```
 
-### Required
+### Required / optional
 
 | Param | Example |
 |-------|---------|
-| `conference_key` | `pak-china-may-24-b2b` |
+| `conference_key` | `pak-china-may-24-b2b` — **optional**. Omit for **All conferences** (all reportable conferences, role-scoped). |
+
+**Specific conference:**
+```
+GET /api/proposals/conference-report?conference_key=...&format=pdf
+```
+
+**All conferences** (backend must accept missing key):
+```
+GET /api/proposals/conference-report?format=pdf
+```
+
+Same Opportunities filters (`sector`, `cooperation_mode`, `sifc_category`, dates, `q`, archive…) apply in both cases.
+
+---
+
+### Format
 
 ### Format
 
@@ -159,8 +175,15 @@ Use `proposal_count` / `scope.filters_applied` in UI subtitle, e.g.
 | Download SIFC report (PDF) | `format=pdf` + same filters |
 | Download SIFC report (Excel) | `format=xlsx` + same filters |
 
-Show buttons when conference has `supports_report === true`.
+Show buttons when the user can view SIFC reports (**Super Admin / Admin / Sector Lead**) — for **All conferences** and a specific conference. Do not gate on `supports_report` alone for visibility.
 
+| Button | Call |
+|--------|------|
+| Preview SIFC report | `format=json` (filters in URL; no key when All) |
+| Download SIFC report (PDF) | `format=pdf` + same filters |
+| Download SIFC report (Excel) | `format=xlsx` + same filters |
+
+**Note:** All-conferences calls need backend support (`conference_key` optional). Until then the API may return 400; FE still shows the buttons and surfaces the error.
 ---
 
 ## Errors

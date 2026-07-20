@@ -9,8 +9,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import ComplaintStatusBadge from '../../components/ComplaintStatusBadge'
 import ProposalOpportunitiesTable from '../../components/proposals/ProposalOpportunitiesTable'
 import StatCard from '../../components/StatCard'
-import StatusBadge from '../../components/StatusBadge'
-import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
+import { getComplaintMouTitle } from '../../utils/complaintDisplay'
 import { formatDate, getErrorMessage } from '../../utils/format'
 
 export default function PartyBDashboard() {
@@ -37,7 +36,7 @@ export default function PartyBDashboard() {
 
     try {
       const compData = await complaintsApi.getMyComplaints()
-      setComplaints(Array.isArray(compData) ? compData : [])
+      setComplaints(compData.data || [])
     } catch (err) {
       errors.push(`Complaints: ${getErrorMessage(err)}`)
       setComplaints([])
@@ -45,7 +44,7 @@ export default function PartyBDashboard() {
 
     try {
       const assignedData = await complaintsApi.getPartyBAssignedComplaints()
-      setAssigned(Array.isArray(assignedData) ? assignedData : [])
+      setAssigned(assignedData.data || [])
     } catch (err) {
       errors.push(`RF assignments: ${getErrorMessage(err)}`)
       setAssigned([])
@@ -165,7 +164,7 @@ export default function PartyBDashboard() {
                       }
                     >
                       <td className="px-4 py-3 font-medium text-slate-800">{c.title}</td>
-                      <td className="px-4 py-3 text-slate-600">{getProposalDisplayTitle(c)}</td>
+                      <td className="px-4 py-3 text-slate-600">{getComplaintMouTitle(c)}</td>
                       <td className="px-4 py-3">
                         <ComplaintStatusBadge status={c.status} />
                       </td>
@@ -227,7 +226,7 @@ export default function PartyBDashboard() {
                 {complaints.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50/80">
                     <td className="px-4 py-3 font-medium text-slate-800">{c.title}</td>
-                    <td className="px-4 py-3 text-slate-600">{getProposalDisplayTitle(c)}</td>
+                    <td className="px-4 py-3 text-slate-600">{getComplaintMouTitle(c)}</td>
                     <td className="px-4 py-3 text-slate-600">{c.tagged_sector_lead_name || '—'}</td>
                     <td className="px-4 py-3">
                       <ComplaintStatusBadge status={c.status} />

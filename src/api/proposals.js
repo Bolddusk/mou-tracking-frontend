@@ -179,7 +179,7 @@ export async function getProposalFilterOptions() {
 
 export async function getConferenceReport(conferenceKey, filters = {}) {
   const params = buildConferenceReportParams({
-    conference_key: conferenceKey,
+    ...(conferenceKey ? { conference_key: conferenceKey } : {}),
     ...filters,
   })
   const response = await client.get('/api/proposals/conference-report', { params })
@@ -217,7 +217,7 @@ export async function downloadConferenceReport(
   { attachment = false, filters = {} } = {},
 ) {
   const params = buildConferenceReportParams({
-    conference_key: conferenceKey,
+    ...(conferenceKey ? { conference_key: conferenceKey } : {}),
     format,
     ...filters,
     ...(attachment ? { download: 1 } : {}),
@@ -228,7 +228,9 @@ export async function downloadConferenceReport(
     responseType: 'blob',
   })
 
-  const safeKey = String(conferenceKey).replace(/[^a-z0-9-]+/gi, '-')
+  const safeKey = conferenceKey
+    ? String(conferenceKey).replace(/[^a-z0-9-]+/gi, '-')
+    : 'all-conferences'
   const defaultName =
     format === 'xlsx' ? `SIFC-report-${safeKey}.xlsx` : `SIFC-report-${safeKey}.pdf`
   const defaultMime =

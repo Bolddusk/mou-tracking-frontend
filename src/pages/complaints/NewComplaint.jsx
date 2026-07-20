@@ -1,28 +1,32 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import * as complaintsApi from '../../api/complaints'
 import * as proposalsApi from '../../api/proposals'
-import * as usersApi from '../../api/users'
 import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import Alert from '../../components/Alert'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { useAuth } from '../../context/AuthContext'
+import {
+  COMPLAINT_CATEGORY_LABELS,
+  COMPLAINT_PRIORITY_LABELS,
+} from '../../utils/complaintDisplay'
 import { formatDate, getErrorMessage } from '../../utils/format'
 
 export default function NewComplaint() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { isPartyB } = useAuth()
   const [proposals, setProposals] = useState([])
-  const [sectorLeads, setSectorLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    proposal_id: '',
-    tagged_sector_lead: '',
+    proposal_id: searchParams.get('proposal_id') || '',
     title: '',
     description: '',
+    priority: 'normal',
+    category: '',
     document_url: '',
   })
 
@@ -31,21 +35,18 @@ export default function NewComplaint() {
       setLoading(true)
       setError('')
       try {
-        const [props, leads] = await Promise.all([
-          proposalsApi.getMyProposals(),
-          usersApi.getSectorLeads(),
-        ])
-        const eligible = (Array.isArray(props) ? props : []).filter(
-          (p) => p.status !== 'draft'
-        )
+        const props = await proposalsApi.getMyProposals()
+        const eligible = (Array.isArray(props) ? props : []).filter((p) => p.status !== 'draft')
         setProposals(eligible)
-        setSectorLeads(Array.isArray(leads) ? leads : [])
-        if (eligible.length > 0) {
-          setForm((f) => ({ ...f, proposal_id: String(eligible[0].id) }))
-        }
-        if (leads?.length > 0) {
-          setForm((f) => ({ ...f, tagged_sector_lead: String(leads[0].id) }))
-        }
+        setForm((f) => {
+          if (f.proposal_id && eligible.some((p) => String(p.id) === String(f.proposal_id))) {
+            return f
+          }
+          return {
+            ...f,
+            proposal_id: eligible.length > 0 ? String(eligible[0].id) : '',
+          }
+        })
       } catch (err) {
         setError(getErrorMessage(err))
       } finally {
@@ -73,20 +74,28 @@ export default function NewComplaint() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.title.trim() || !form.description.trim()) return
+    if (!form.proposal_id || !form.title.trim() || !form.description.trim()) return
     setSubmitting(true)
     setError('')
     try {
       const created = await complaintsApi.createComplaint({
         proposal_id: Number(form.proposal_id),
-        tagged_sector_lead: Number(form.tagged_sector_lead),
         title: form.title.trim(),
         description: form.description.trim(),
+        priority: form.priority || 'normal',
+        category: form.category || undefined,
         document_url: form.document_url || undefined,
       })
       navigate(`/complaints/${created.id}`)
     } catch (err) {
-      setError(getErrorMessage(err))
+      const existingId = err?.response?.data?.existing_complaint_id
+      if (err?.response?.status === 409 && existingId) {
+        setError(
+          `${getErrorMessage(err)} Open the existing complaint #${existingId}, or change the title.`,
+        )
+      } else {
+        setError(getErrorMessage(err))
+      }
     } finally {
       setSubmitting(false)
     }
@@ -103,17 +112,15 @@ export default function NewComplaint() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link
-          to="/complaints"
-          className="text-sm font-medium text-green-600 hover:underline"
-        >
+        <Link to="/complaints" className="text-sm font-medium text-green-600 hover:underline">
           ← Back to complaints
         </Link>
         <h3 className="mt-2 text-lg font-semibold text-slate-800">File a Complaint</h3>
         <p className="text-sm text-slate-500">
           {isPartyB
             ? 'Report a grievance related to a proposal you are linked to as Party B.'
-            : 'Report a grievance related to one of your submitted proposals.'}
+            : 'Report a grievance related to one of your submitted proposals.'}{' '}
+          The Sector Lead for the MOU sector is assigned automatically.
         </p>
       </div>
 
@@ -149,22 +156,8 @@ export default function NewComplaint() {
             >
               {proposals.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {getProposalDisplayTitle(p)} — {p.sector} ({p.status}) · {formatDate(p.created_at)}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Tag Sector Lead" required>
-            <select
-              value={form.tagged_sector_lead}
-              onChange={(e) => setForm((f) => ({ ...f, tagged_sector_lead: e.target.value }))}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              required
-            >
-              {sectorLeads.map((lead) => (
-                <option key={lead.id} value={lead.id}>
-                  {lead.full_name} — {lead.sector}
+                  {getProposalDisplayTitle(p)} — {p.sector} ({p.status}) ·{' '}
+                  {formatDate(p.created_at)}
                 </option>
               ))}
             </select>
@@ -175,11 +168,41 @@ export default function NewComplaint() {
               type="text"
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              placeholder="e.g. Delayed sector review"
+              placeholder="e.g. Delay in MOU follow-up"
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
               required
             />
           </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Priority">
+              <select
+                value={form.priority}
+                onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                {Object.entries(COMPLAINT_PRIORITY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Category">
+              <select
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="">Select (optional)</option>
+                {Object.entries(COMPLAINT_CATEGORY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
 
           <Field label="Description" required>
             <textarea
