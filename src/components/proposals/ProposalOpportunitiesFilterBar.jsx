@@ -62,6 +62,8 @@ export default function ProposalOpportunitiesFilterBar({
   showArchiveFilter = false,
   archiveFilter = '',
   onArchiveFilterChange,
+  /** Same Opportunities filters as the table (minus page/limit) — applied to Preview/PDF/Excel */
+  reportFilters = {},
   onReportError,
 }) {
   return (
@@ -86,6 +88,7 @@ export default function ProposalOpportunitiesFilterBar({
             <ConferenceReportActions
               conferenceKey={selectedConference.key}
               conferenceName={selectedConference.name}
+              reportFilters={reportFilters}
               onError={onReportError}
             />
           )}

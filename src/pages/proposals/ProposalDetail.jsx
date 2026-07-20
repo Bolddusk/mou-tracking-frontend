@@ -1082,7 +1082,6 @@ export default function ProposalDetail() {
                 {proposal.company_name && proposal.venture_name
                   ? `${proposal.company_name} · ${proposal.sector}`
                   : proposal.sector}
-                {proposal.project_type ? ` · ${proposal.project_type}` : ''}
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">

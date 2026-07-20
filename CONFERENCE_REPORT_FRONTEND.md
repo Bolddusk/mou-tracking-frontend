@@ -1,92 +1,183 @@
-# Conference Report API — Frontend
+# Conference / SIFC Report API — Frontend
 
 ## Business logic
 
 - Sirf **reportable** conferences (`supports_report: true` in filter-options).
-- **super_admin / admin** → conference ke saare non-draft MOUs.
-- **sector_lead** → sirf apne `assigned_sectors` ke MOUs (backend auto-filter).
-- **party_a** aur baaki roles → 403.
-- Status buckets: `in_execution` | `active` | `inactive` (`executive_summary.mou_operational_status` se).
-- Snapshot: group by SIFC category + sub-category + `cooperation_mode`, subtotals per category, grand total.
+- **No extra filters** → same as before: full conference report (role-scoped).
+- **With dashboard filters** → report = **exactly the filtered list** (same query params as Opportunities table).
+- Roles:
+
+| Role | Report scope |
+|------|----------------|
+| `super_admin` / `admin` | All non-draft MOUs for that conference (+ filters) |
+| `sector_lead` | Own assigned sectors only (+ filters) |
+| `party_a` | Own linked MOUs only |
+| `party_b` / `investor` | Own linked MOUs only |
 
 ---
 
-## 1. Report JSON
+## Endpoint
 
-`GET /api/proposals/conference-report?conference_key=pak-china-sep-25-conference`
+```
+GET /api/proposals/conference-report
+```
 
-**Auth:** Bearer token — `super_admin`, `admin`, `sector_lead`
+### Required
 
-**Response (shape):**
+| Param | Example |
+|-------|---------|
+| `conference_key` | `pak-china-may-24-b2b` |
+
+### Format
+
+| `format` | Response |
+|----------|----------|
+| `json` (default) | Preview JSON |
+| `xlsx` | Excel download |
+| `pdf` | PDF (`&download=1` for attachment) |
+
+### Optional filters (same as list / Opportunities)
+
+Pass **the same query string** you use for `GET /api/proposals/all` (or sector-lead list), minus `page` / `limit`:
+
+| Param | Example | Effect |
+|-------|---------|--------|
+| `sector` | `Seed Sales` | Only that sector |
+| `cooperation_mode` | `mou` \| `jv` \| `agreement` | Mode filter |
+| `sifc_category` | `Investment Export Oriented` | SIFC category |
+| `mou_lifecycle` | `active` \| `inactive` \| `execution` | Lifecycle pill |
+| `date_from` / `date_to` | `2024-01-01` | `YYYY-MM-DD` on `created_at` |
+| `q` | `ms group` | Search text |
+| `archive` / `archive_filter` | `active` \| `archived` \| `all` | Archive scope |
+| `include_deleted` / `archived_only` | `1` | Same as Opportunities list archive toggles |
+| `status` | `approved` | Workflow status (rare for SIFC) |
+
+**Rule:** Jo table mein rows dikh rahi hain (us conference + filters pe), wahi SIFC report mein aani chahiye.
+
+---
+
+## Frontend wiring (dashboard)
+
+Implemented in:
+
+- `src/utils/conferenceReportQuery.js` — `buildSifcReportQuery` / `buildConferenceReportParams` / `reportFiltersFromListParams`
+- `src/api/proposals.js` — `getConferenceReport(key, filters)`, PDF/Excel download with filters
+- `ConferenceReportActions` — Preview / PDF / Excel all use current Opportunities filter state
+- Super Admin + Sector Lead dashboards pass `reportFilters` from `listParams`
+
+```ts
+function buildSifcReportQuery(filters: {
+  conference_key: string
+  sector?: string
+  cooperation_mode?: string
+  sifc_category?: string
+  mou_lifecycle?: string
+  date_from?: string
+  date_to?: string
+  q?: string
+  archive?: string
+  format?: 'json' | 'xlsx' | 'pdf'
+  download?: '1'
+}) {
+  const params = new URLSearchParams()
+  params.set('conference_key', filters.conference_key)
+  params.set('format', filters.format || 'json')
+
+  const optional = [
+    'sector',
+    'cooperation_mode',
+    'sifc_category',
+    'mou_lifecycle',
+    'date_from',
+    'date_to',
+    'q',
+    'archive',
+  ] as const
+
+  for (const key of optional) {
+    const value = filters[key]
+    if (value != null && String(value).trim() !== '' && String(value) !== 'all') {
+      params.set(key, String(value))
+    }
+  }
+
+  if (filters.download) params.set('download', filters.download)
+  return params.toString()
+}
+```
+
+### Examples
+
+**General (no filters — old behaviour):**
+```
+GET /api/proposals/conference-report?conference_key=pak-china-may-24-b2b&format=pdf
+```
+
+**Filtered (MoU + Seed Sales):**
+```
+GET /api/proposals/conference-report?conference_key=pak-china-may-24-b2b&cooperation_mode=mou&sector=Seed%20Sales&format=pdf
+```
+
+---
+
+## JSON extras
+
 ```json
 {
-  "conference": {
-    "key": "pak-china-sep-25-conference",
-    "name": "Pak China Sep-25 Conference",
-    "report_title": "Snapshot (PM's China Visit, Sept 25, B2B, MNFSR)"
+  "conference": { "key": "...", "name": "...", "report_title": "..." },
+  "scope": {
+    "list_scope": "all",
+    "filters_applied": true,
+    "filters": {
+      "conference_key": "...",
+      "sector": "Seed Sales",
+      "cooperation_mode": "mou",
+      "sifc_category": null,
+      "mou_lifecycle": null,
+      "q": null,
+      "date_from": null,
+      "date_to": null
+    }
   },
-  "scope": { "list_scope": "all", "sector": null, "sectors": null },
-  "generated_at": "2026-07-03T09:00:00.000Z",
-  "proposal_count": 31,
-  "snapshot": { "rows": [/* data | subtotal | grand_total */] },
-  "sections": {
-    "in_execution": [/* detail rows */],
-    "active": [],
-    "inactive": []
-  }
+  "proposal_count": 2,
+  "summary_counts": { "in_execution": 0, "active": 2, "inactive": 0 },
+  "snapshot": { "rows": [] },
+  "sections": { "in_execution": [], "active": [], "inactive": [] }
 }
 ```
 
-**Sector lead scope example:**
-```json
-"scope": {
-  "list_scope": "sector",
-  "sector": null,
-  "sectors": ["Agri-chemicals & Inputs", "Food Processing & Value Addition"]
-}
-```
-
-**Errors:** `400` missing `conference_key` / SL without sector · `403` not reportable or no access
+Use `proposal_count` / `scope.filters_applied` in UI subtitle, e.g.  
+`SIFC report · 2 MOUs (filtered)` vs `SIFC report · 48 MOUs`.
 
 ---
 
-## 2. PDF (basic)
+## Buttons (dashboard)
 
-`GET /api/proposals/conference-report?conference_key=...&format=pdf`
+| Button | Call |
+|--------|------|
+| Preview SIFC report | `format=json` then render / print (filters in URL search) |
+| Download SIFC report (PDF) | `format=pdf` + same filters |
+| Download SIFC report (Excel) | `format=xlsx` + same filters |
 
-Same RBAC. Returns `application/pdf` inline.
-
-Template-exact PDF baad mein improve ho sakta hai; abhi snapshot + 3 sections ka summary PDF.
-
----
-
-## 3. Filter options flag
-
-`GET /api/proposals/filter-options` — har conference object mein:
-
-```json
-{ "key": "pak-china-sep-25-conference", "name": "...", "supports_report": true, "proposal_count": 31 }
-```
-
-**UI:** `supports_report === true` par "Download Conference Report" button dikhao.
+Show buttons when conference has `supports_report === true`.
 
 ---
 
-## Reportable conference keys
+## Errors
 
-- `pak-china-sep-25-conference`
-- `pak-china-islamabad-agri-2026`
-- `pak-china-hangzhou-agri-2026`
+| Code | When |
+|------|------|
+| 400 | Missing `conference_key` / invalid filter / invalid format |
+| 403 | Role not allowed / conference not reportable / SL sector outside scope |
+| 404 | Unknown `conference_key` |
+| 503 | PDF Chromium missing — use Excel |
 
 ---
 
-## Detail row fields
+## Checklist
 
-| Section | Extra fields |
-|---------|----------------|
-| `in_execution` | `outcome`, `action_taken` (default: "No issue was reported") |
-| `active` / `inactive` | `product`, `bottlenecks` (default: "Nil") |
-
-Common: `sr`, `pak_company`, `chinese_company`, `mou_value_usd_m`, `value_label`, `location`, `status_feedback`, `tentative_timeline`
-
-Null display: `—` / `Nil` / `Not specified` (backend normalizes).
+- [x] Preview/PDF/Excel use **same** filter state as Opportunities table
+- [x] Clearing filters → full conference report again
+- [ ] Sector Lead cannot pass another sector (backend)
+- [ ] Party A/B only get their own MOUs in the report (backend)
+- [ ] Empty filter result → empty report (0 rows), not an error

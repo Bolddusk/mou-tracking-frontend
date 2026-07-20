@@ -20,8 +20,10 @@ export function formatReportCell(value) {
 
 export function buildScopeLabel(scope) {
   if (!scope) return null
-  if (scope.list_scope === 'all') return 'All sectors'
+  const filtered = scope.filters_applied === true ? ' (filtered)' : ''
+  if (scope.list_scope === 'all') return `All sectors${filtered}`
   const sectors = scope.sectors?.length ? scope.sectors : scope.sector ? [scope.sector] : []
-  if (sectors.length) return `Sector scope: ${sectors.join(', ')}`
-  return 'Sector-scoped report'
+  if (sectors.length) return `Sector scope: ${sectors.join(', ')}${filtered}`
+  if (scope.list_scope === 'own') return `Linked MOUs only${filtered}`
+  return `Sector-scoped report${filtered}`
 }

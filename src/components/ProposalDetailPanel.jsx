@@ -127,7 +127,6 @@ export default function ProposalDetailPanel({
           <InfoRow label="Company" value={proposal.company_name} />
           <InfoRow label="Venture" value={proposal.venture_name} />
           <InfoRow label="Sector" value={proposal.sector} />
-          <InfoRow label="Project Type" value={proposal.project_type} />
           <InfoRow label="Status" value={<StatusBadge status={proposal.status} />} />
           {proposal.party_a_name && <InfoRow label="Party A" value={proposal.party_a_name} />}
           <InfoRow label="Submitted" value={formatDate(proposal.submitted_at || proposal.created_at)} />

@@ -1,5 +1,6 @@
 import client from './client'
 import { buildChangeLogListParams } from '../utils/changeLogFilters'
+import { buildConferenceReportParams } from '../utils/conferenceReportQuery'
 import { getProposalsListApi, PROPOSALS_LIST_API } from '../utils/rbac'
 
 function normalizePaginatedListResponse(body, params = {}) {
@@ -176,10 +177,12 @@ export async function getProposalFilterOptions() {
   return response.data
 }
 
-export async function getConferenceReport(conferenceKey) {
-  const response = await client.get('/api/proposals/conference-report', {
-    params: { conference_key: conferenceKey },
+export async function getConferenceReport(conferenceKey, filters = {}) {
+  const params = buildConferenceReportParams({
+    conference_key: conferenceKey,
+    ...filters,
   })
+  const response = await client.get('/api/proposals/conference-report', { params })
   return response.data
 }
 
@@ -205,11 +208,20 @@ function triggerFileDownload(objectUrl, filename) {
 
 /**
  * @param {'pdf'|'xlsx'} format
- * @param {{ attachment?: boolean }} [options] — PDF default inline tab; xlsx always downloads
+ * @param {{ attachment?: boolean, filters?: Record<string, unknown> }} [options]
+ *   PDF default inline tab; xlsx always downloads. `filters` = Opportunities query (minus page/limit).
  */
-export async function downloadConferenceReport(conferenceKey, format, { attachment = false } = {}) {
-  const params = { conference_key: conferenceKey, format }
-  if (attachment) params.download = 1
+export async function downloadConferenceReport(
+  conferenceKey,
+  format,
+  { attachment = false, filters = {} } = {},
+) {
+  const params = buildConferenceReportParams({
+    conference_key: conferenceKey,
+    format,
+    ...filters,
+    ...(attachment ? { download: 1 } : {}),
+  })
 
   const response = await client.get('/api/proposals/conference-report', {
     params,
@@ -243,12 +255,12 @@ export async function downloadConferenceReport(conferenceKey, format, { attachme
   setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
 }
 
-export async function downloadConferenceReportPdf(conferenceKey) {
-  return downloadConferenceReport(conferenceKey, 'pdf')
+export async function downloadConferenceReportPdf(conferenceKey, filters = {}) {
+  return downloadConferenceReport(conferenceKey, 'pdf', { filters })
 }
 
-export async function downloadConferenceReportXlsx(conferenceKey) {
-  return downloadConferenceReport(conferenceKey, 'xlsx', { attachment: true })
+export async function downloadConferenceReportXlsx(conferenceKey, filters = {}) {
+  return downloadConferenceReport(conferenceKey, 'xlsx', { attachment: true, filters })
 }
 
 export async function getProposalSifcReport(proposalId) {

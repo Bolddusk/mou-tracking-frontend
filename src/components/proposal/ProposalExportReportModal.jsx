@@ -145,7 +145,6 @@ export default function ProposalExportReportModal({ open, report, onClose, onExp
               items={[
                 ['Venture', overview?.venture_name],
                 ['Company', overview?.company_name],
-                ['Project type', overview?.project_type],
                 ['Conference', overview?.conference_name],
                 ['MOU scope', overview?.mou_scope],
               ]}

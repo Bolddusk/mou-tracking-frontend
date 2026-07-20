@@ -204,7 +204,6 @@ export function formToPayload(form, proposalId, { ownerId, ownerField } = {}) {
     venture_name: form.venture_name?.trim() || undefined,
     title: form.venture_name?.trim() || form.company_name?.trim() || undefined,
     description: form.description?.trim() || form.executive_summary?.project_overview || undefined,
-    project_type: form.project_type || undefined,
     investment_amount: investmentUsd ? Number(investmentUsd) : undefined,
     conference_info: form.conference_info,
     submitter_info: form.submitter_info,

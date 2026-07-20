@@ -6,21 +6,32 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import { getPartyAProfilePaths, getProfileAccessError } from '../../constants/profileRoutes'
 import { useAuth } from '../../context/AuthContext'
 import { formatDate, getErrorMessage, resolveFileUrl } from '../../utils/format'
+import { documentFileUrl, getProfileDocument } from '../../utils/profileDocuments'
 import PartyAProfile from './PartyAProfile'
 
 function ViewDocButton({ url, label = 'View Document' }) {
   if (!url) {
     return <span className="text-sm text-slate-400">Not uploaded</span>
   }
+  const href = resolveFileUrl(url)
   return (
-    <a
-      href={resolveFileUrl(url)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center rounded-lg bg-portal-primary px-4 py-2 text-sm font-semibold text-white hover:bg-portal-primary-hover"
-    >
-      {label}
-    </a>
+    <div className="flex flex-wrap gap-2">
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center rounded-lg bg-portal-primary px-4 py-2 text-sm font-semibold text-white hover:bg-portal-primary-hover"
+      >
+        {label}
+      </a>
+      <a
+        href={href}
+        download
+        className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+      >
+        Download
+      </a>
+    </div>
   )
 }
 
@@ -31,17 +42,6 @@ function InfoRow({ label, value }) {
       <dd className="mt-0.5 text-sm text-slate-800">{value || '—'}</dd>
     </div>
   )
-}
-
-function mergeDoc(completionDoc, documents, docType) {
-  const fromList = documents.find((d) => d.doc_type === docType)
-  if (!completionDoc && !fromList) return null
-  return {
-    ...fromList,
-    ...completionDoc,
-    file_url: completionDoc?.file_url || fromList?.file_url,
-    original_filename: completionDoc?.original_filename || fromList?.original_filename,
-  }
 }
 
 export default function PartyAProfileView() {
@@ -123,8 +123,8 @@ export default function PartyAProfileView() {
   const documents = data?.documents || []
   const completionPct = completion.completion_pct ?? 0
   const missingFields = completion.missing_fields || []
-  const fbrDoc = mergeDoc(completion.mandatory_documents?.fbr_certificate, documents, 'fbr_certificate')
-  const secpDoc = mergeDoc(completion.mandatory_documents?.secp_certificate, documents, 'secp_certificate')
+  const fbrDoc = getProfileDocument('fbr_certificate', { completion, documents })
+  const secpDoc = getProfileDocument('secp_certificate', { completion, documents })
   const otherDocs = completion.other_documents?.length
     ? completion.other_documents
     : documents.filter((d) => d.doc_type === 'other')
@@ -247,7 +247,7 @@ export default function PartyAProfileView() {
             <p className="mt-1 text-sm text-slate-600">{fbrDoc.original_filename}</p>
           )}
           <div className="mt-3">
-            <ViewDocButton url={fbrDoc?.file_url} />
+            <ViewDocButton url={documentFileUrl(fbrDoc)} />
           </div>
         </div>
 
@@ -257,7 +257,7 @@ export default function PartyAProfileView() {
             <p className="mt-1 text-sm text-slate-600">{secpDoc.original_filename}</p>
           )}
           <div className="mt-3">
-            <ViewDocButton url={secpDoc?.file_url} />
+            <ViewDocButton url={documentFileUrl(secpDoc)} />
           </div>
         </div>
       </section>

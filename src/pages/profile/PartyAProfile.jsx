@@ -4,6 +4,11 @@ import * as profileApi from '../../api/profile'
 import Alert from '../../components/Alert'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { getErrorMessage, resolveFileUrl } from '../../utils/format'
+import {
+  documentFileUrl,
+  getProfileDocument,
+  mergeDocumentsList,
+} from '../../utils/profileDocuments'
 import ComplianceFilingsPanel from '../../components/compliance/ComplianceFilingsPanel'
 
 const FILE_ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp'
@@ -69,9 +74,10 @@ function formToPayload(form) {
   }
 }
 
-function applyProfileData(data, setForm, setCompletion, setAvailableSectors) {
+function applyProfileData(data, setForm, setCompletion, setDocuments, setAvailableSectors) {
   setForm(profileToForm(data.profile))
   setCompletion(data.completion || null)
+  setDocuments((prev) => mergeDocumentsList(prev, data))
   if (Array.isArray(data.available_sectors)) {
     setAvailableSectors(data.available_sectors)
   }
@@ -90,6 +96,7 @@ export default function PartyAProfile({ staffUserId = null }) {
   const [form, setForm] = useState(EMPTY_FORM)
   const [availableSectors, setAvailableSectors] = useState([])
   const [completion, setCompletion] = useState(null)
+  const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(null)
@@ -110,7 +117,7 @@ export default function PartyAProfile({ staffUserId = null }) {
       const data = isStaffEdit
         ? await profileApi.getProfileByUserId(staffUserId)
         : await profileApi.getProfile()
-      applyProfileData(data, setForm, setCompletion, setAvailableSectors)
+      applyProfileData(data, setForm, setCompletion, setDocuments, setAvailableSectors)
 
       if (!data.available_sectors?.length) {
         try {
@@ -159,7 +166,7 @@ export default function PartyAProfile({ staffUserId = null }) {
       const data = isStaffEdit
         ? await profileApi.updatePartyAProfileByUserId(staffUserId, formToPayload(form))
         : await profileApi.updateProfile(formToPayload(form))
-      applyProfileData(data, setForm, setCompletion, setAvailableSectors)
+      applyProfileData(data, setForm, setCompletion, setDocuments, setAvailableSectors)
       setSuccess(data.message || 'Profile updated')
     } catch (err) {
       setError(getErrorMessage(err))
@@ -177,7 +184,7 @@ export default function PartyAProfile({ staffUserId = null }) {
       const data = isStaffEdit
         ? await profileApi.uploadPartyAProfileDocumentByUserId(staffUserId, { file, docType })
         : await profileApi.uploadProfileDocument({ file, docType })
-      applyProfileData(data, setForm, setCompletion, setAvailableSectors)
+      applyProfileData(data, setForm, setCompletion, setDocuments, setAvailableSectors)
       setSuccess(`${docType === 'fbr_certificate' ? 'FBR' : 'SECP'} certificate uploaded`)
     } catch (err) {
       setError(getErrorMessage(err))
@@ -206,7 +213,7 @@ export default function PartyAProfile({ staffUserId = null }) {
             title: otherForm.title.trim(),
             description: otherForm.description.trim() || undefined,
           })
-      applyProfileData(data, setForm, setCompletion, setAvailableSectors)
+      applyProfileData(data, setForm, setCompletion, setDocuments, setAvailableSectors)
       setOtherForm({ title: '', description: '', file: null })
       setSuccess('Document uploaded')
     } catch (err) {
@@ -225,7 +232,7 @@ export default function PartyAProfile({ staffUserId = null }) {
       const data = isStaffEdit
         ? await profileApi.deletePartyAProfileDocumentByUserId(staffUserId, id)
         : await profileApi.deleteProfileDocument(id)
-      applyProfileData(data, setForm, setCompletion, setAvailableSectors)
+      applyProfileData(data, setForm, setCompletion, setDocuments, setAvailableSectors)
       setSuccess('Document deleted')
     } catch (err) {
       setError(getErrorMessage(err))
@@ -234,9 +241,12 @@ export default function PartyAProfile({ staffUserId = null }) {
     }
   }
 
-  const fbrDoc = completion?.mandatory_documents?.fbr_certificate
-  const secpDoc = completion?.mandatory_documents?.secp_certificate
-  const otherDocs = completion?.other_documents || []
+  const fbrDoc = getProfileDocument('fbr_certificate', { completion, documents })
+  const secpDoc = getProfileDocument('secp_certificate', { completion, documents })
+  const otherDocs =
+    completion?.other_documents?.length > 0
+      ? completion.other_documents
+      : documents.filter((d) => d.doc_type === 'other')
   const completionPct = completion?.completion_pct ?? 0
   const missingFields = completion?.missing_fields || []
 
@@ -637,15 +647,24 @@ function MandatoryDocCard({ title, doc, uploading, onFileSelect, children }) {
             <p className="font-medium text-green-900">
               {doc.original_filename || 'Document on file'}
             </p>
-            {doc.file_url && (
-              <a
-                href={resolveFileUrl(doc.file_url)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 inline-block font-medium text-portal-primary hover:underline"
-              >
-                View document
-              </a>
+            {documentFileUrl(doc) && (
+              <div className="mt-1 flex flex-wrap gap-3">
+                <a
+                  href={resolveFileUrl(documentFileUrl(doc))}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-portal-primary hover:underline"
+                >
+                  View document
+                </a>
+                <a
+                  href={resolveFileUrl(documentFileUrl(doc))}
+                  download={doc.original_filename || true}
+                  className="font-medium text-slate-600 hover:underline"
+                >
+                  Download
+                </a>
+              </div>
             )}
           </div>
         ) : null}

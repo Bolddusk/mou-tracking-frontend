@@ -42,6 +42,7 @@ import {
   getOpportunitiesDashboardHeader,
   normalizeMouLifecycleStatuses,
 } from '../../utils/mouConferenceFields'
+import { reportFiltersFromListParams } from '../../utils/conferenceReportQuery'
 import { getOpportunitiesNavLabel, getProposalsListScope } from '../../utils/rbac'
 import { loadDraftFromProposal } from '../../utils/proposalDraft'
 import {
@@ -220,6 +221,11 @@ export default function SuperAdminDashboard() {
     listScope,
     archiveFilter,
   ])
+
+  const reportFilters = useMemo(
+    () => reportFiltersFromListParams(listParams),
+    [listParams],
+  )
 
   useEffect(() => {
     setPage(1)
@@ -541,6 +547,7 @@ export default function SuperAdminDashboard() {
             hasActiveFilters ||
             (usesLifecycleTabs ? listTabFilter !== 'all' : Boolean(statusFilter))
           }
+          reportFilters={reportFilters}
           onReportError={setError}
         />
 

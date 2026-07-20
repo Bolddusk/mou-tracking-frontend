@@ -40,6 +40,7 @@ import {
   getOpportunitiesDashboardHeader,
   normalizeMouLifecycleStatuses,
 } from '../../utils/mouConferenceFields'
+import { reportFiltersFromListParams } from '../../utils/conferenceReportQuery'
 import {
   formatScopedSectorsDetail,
   getScopedSectors,
@@ -208,6 +209,11 @@ export default function SectorLeadDashboard() {
         limit,
       }),
     [listTabFilter, dashboardTabFilters, searchQuery, advancedFilters, cooperationModeFilter, conferenceFilter, page, limit],
+  )
+
+  const reportFilters = useMemo(
+    () => reportFiltersFromListParams(listParams),
+    [listParams],
   )
 
   useEffect(() => {
@@ -474,6 +480,7 @@ export default function SectorLeadDashboard() {
           hideMouLifecycleFilter
           onClearAll={clearAllFilters}
           hasActiveFilters={hasActiveFilters || listTabFilter !== 'all'}
+          reportFilters={reportFilters}
           onReportError={setError}
         />
 

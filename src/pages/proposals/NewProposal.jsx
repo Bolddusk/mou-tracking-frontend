@@ -14,7 +14,6 @@ import {
   ENGAGEMENT_TYPES,
   ENTITY_TYPES,
   PROPOSAL_STEPS,
-  PROJECT_TYPES,
   TOTAL_STEPS,
   fundUtilizationTotal,
   suggestedEntityTypes,
@@ -1021,10 +1020,12 @@ export default function NewProposal({ variant = 'legacy' }) {
             <SectionTitle step={step} totalSteps={maxStep} title="Cover Page" />
             <Field label="Company Name" value={form.company_name} onChange={setField('company_name')} required />
             {isMm && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Venture Name" value={form.venture_name} onChange={setField('venture_name')} required />
-                <Select label="Project Type" value={form.project_type} onChange={setField('project_type')} options={PROJECT_TYPES} />
-              </div>
+              <Field
+                label="Venture Name"
+                value={form.venture_name}
+                onChange={setField('venture_name')}
+                required
+              />
             )}
             <div className="grid gap-4 sm:grid-cols-2">
             <ImageField

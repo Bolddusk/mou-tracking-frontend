@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import * as proposalsApi from '../../api/proposals'
 import Alert from '../../components/Alert'
 import ConferenceReportView from '../../components/reports/ConferenceReportView'
@@ -7,11 +7,28 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES } from '../../constants/sectors'
 import { getErrorMessage } from '../../utils/format'
+import { buildConferenceReportParams } from '../../utils/conferenceReportQuery'
 
 const REPORT_ROLES = new Set([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.SECTOR_LEAD])
 
+const FILTER_SEARCH_KEYS = [
+  'sector',
+  'cooperation_mode',
+  'sifc_category',
+  'mou_lifecycle',
+  'date_from',
+  'date_to',
+  'q',
+  'status',
+  'archive',
+  'archive_filter',
+  'include_deleted',
+  'archived_only',
+]
+
 export default function ConferenceReportPage() {
   const { conferenceKey } = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user, dashboardPath } = useAuth()
   const [report, setReport] = useState(null)
@@ -22,12 +39,21 @@ export default function ConferenceReportPage() {
 
   const canAccess = REPORT_ROLES.has(user?.role)
 
+  const reportFilters = useMemo(() => {
+    const raw = {}
+    for (const key of FILTER_SEARCH_KEYS) {
+      const value = searchParams.get(key)
+      if (value != null && value !== '') raw[key] = value
+    }
+    return buildConferenceReportParams(raw)
+  }, [searchParams])
+
   const load = useCallback(async () => {
     if (!conferenceKey || !canAccess) return
     setLoading(true)
     setError('')
     try {
-      const data = await proposalsApi.getConferenceReport(conferenceKey)
+      const data = await proposalsApi.getConferenceReport(conferenceKey, reportFilters)
       setReport(data)
     } catch (err) {
       setReport(null)
@@ -35,7 +61,7 @@ export default function ConferenceReportPage() {
     } finally {
       setLoading(false)
     }
-  }, [conferenceKey, canAccess])
+  }, [conferenceKey, canAccess, reportFilters])
 
   useEffect(() => {
     load()
@@ -48,7 +74,7 @@ export default function ConferenceReportPage() {
     setPdfLoading(true)
     setError('')
     try {
-      await proposalsApi.downloadConferenceReportPdf(conferenceKey)
+      await proposalsApi.downloadConferenceReportPdf(conferenceKey, reportFilters)
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -61,7 +87,7 @@ export default function ConferenceReportPage() {
     setXlsxLoading(true)
     setError('')
     try {
-      await proposalsApi.downloadConferenceReportXlsx(conferenceKey)
+      await proposalsApi.downloadConferenceReportXlsx(conferenceKey, reportFilters)
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -96,10 +122,12 @@ export default function ConferenceReportPage() {
             </button>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Conference report
+                SIFC report
+                {report?.scope?.filters_applied ? ' · filtered' : ''}
               </p>
               <p className="text-sm font-semibold text-slate-900">
                 {report?.conference?.name || conferenceKey}
+                {report?.proposal_count != null ? ` · ${report.proposal_count} MOUs` : ''}
               </p>
             </div>
           </div>

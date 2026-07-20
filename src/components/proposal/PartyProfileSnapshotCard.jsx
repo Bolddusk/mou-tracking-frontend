@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { resolveFileUrl } from '../../utils/format'
+import { documentFileUrl, getProfileDocument } from '../../utils/profileDocuments'
 import DetailField from './DetailField'
 
 const PARTY_A_MANDATORY = [
@@ -37,18 +38,29 @@ function CompletionBadge({ pct = 0, complete = false }) {
 }
 
 function DocFieldContent({ doc }) {
-  if (!doc?.file_url) {
+  const url = documentFileUrl(doc)
+  if (!url) {
     return <p className="mt-1.5 text-sm text-slate-400">Not uploaded</p>
   }
+  const href = resolveFileUrl(url)
   return (
-    <a
-      href={resolveFileUrl(doc.file_url)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mt-1.5 inline-block text-sm font-medium text-portal-primary hover:underline"
-    >
-      {doc.original_filename || 'View document'}
-    </a>
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-sm font-medium text-portal-primary hover:underline"
+      >
+        {doc.original_filename || 'View document'}
+      </a>
+      <a
+        href={href}
+        download={doc.original_filename || true}
+        className="text-sm font-medium text-slate-600 hover:underline"
+      >
+        Download
+      </a>
+    </div>
   )
 }
 
@@ -68,17 +80,8 @@ export default function PartyProfileSnapshotCard({
   const pct = completion?.completion_pct ?? 0
   const complete = completion?.profile_complete === true
 
-  const getMandatoryDoc = (docType) => {
-    const fromCompletion = completion?.mandatory_documents?.[docType]
-    const fromList = documents.find((d) => d.doc_type === docType)
-    if (!fromCompletion && !fromList) return null
-    return {
-      ...fromList,
-      ...fromCompletion,
-      file_url: fromCompletion?.file_url || fromList?.file_url,
-      original_filename: fromCompletion?.original_filename || fromList?.original_filename,
-    }
-  }
+  const getMandatoryDoc = (docType) =>
+    getProfileDocument(docType, { completion, documents })
 
   const shellClass = embedded
     ? 'flex h-full flex-col'

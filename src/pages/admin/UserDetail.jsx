@@ -97,7 +97,10 @@ export default function UserDetail() {
   const userNeedsSector =
     user && ['sector_lead', 'regional_focal_point'].includes(user.role)
   const isSelf = Number(currentUser?.id) === Number(user?.id)
-  const isPartyB = user?.role === 'party_b'
+  const isPartyA = user?.role === 'party_a' || user?.role === ROLES.PARTY_A
+  const isPartyB = user?.role === 'party_b' || user?.role === ROLES.PARTY_B
+  const isPartyLoginRole =
+    isPartyA || isPartyB || user?.role === ROLES.INVESTOR || user?.role === 'investor'
   const hasRecords = hasPortalRecords(user?.stats)
   const canDelete = user && !isSelf && (!hasRecords || isPartyB)
   const deleteWithUnlink = isPartyB || deleteUnlinkMode
@@ -151,7 +154,11 @@ export default function UserDetail() {
       await usersApi.resetUserPassword(id, passwordForm.password)
       setPasswordOpen(false)
       setPasswordForm({ password: '', confirm: '' })
-      setSuccess('Password reset successfully')
+      setSuccess(
+        user?.email
+          ? `Password reset for ${user.email}. Share the new password securely — the previous password cannot be recovered.`
+          : 'Password reset successfully. Share the new password securely.',
+      )
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -286,6 +293,42 @@ export default function UserDetail() {
           <Info label="Phone" value={user.phone} />
           <Info label="Joined" value={formatDate(user.created_at)} />
         </div>
+
+        {isPartyLoginRole && (
+          <div className="border-t border-slate-100 px-6 py-4">
+            <h2 className="text-sm font-semibold text-slate-800">
+              {isPartyA ? 'Party A login' : isPartyB ? 'Party B login' : 'Portal login'}
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Previous passwords cannot be shown again. Use the login email below; set a new
+              password with Reset Password if Sector Lead missed generating credentials.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  Login email
+                </p>
+                <code className="break-all text-sm font-medium text-slate-800">{user.email}</code>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (user.email) navigator.clipboard?.writeText(String(user.email))
+                }}
+                className="shrink-0 rounded border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Copy email
+              </button>
+              <button
+                type="button"
+                onClick={() => setPasswordOpen(true)}
+                className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Reset Password
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-slate-50/50 px-6 py-4">
           {user.role === ROLES.PARTY_A && (
@@ -481,6 +524,13 @@ export default function UserDetail() {
         }
       >
         <div className="space-y-3">
+          {user?.email && (
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Login email: <code className="font-medium text-slate-800">{user.email}</code>
+              <br />
+              Previous password cannot be retrieved — this sets a new one to share with the user.
+            </p>
+          )}
           <Input
             label="New Password"
             type="password"
