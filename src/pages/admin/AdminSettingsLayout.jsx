@@ -11,10 +11,10 @@ function tabIsActive(tab, pathname) {
 }
 
 function settingsTabClass(isActive) {
-  return `inline-flex shrink-0 items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition-all sm:px-6 sm:py-3.5 sm:text-base ${
+  return `rounded-t-lg px-4 py-2.5 text-sm font-semibold transition ${
     isActive
-      ? 'bg-portal-primary text-white shadow-md shadow-green-900/15 ring-1 ring-portal-primary/20'
-      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+      ? 'border border-b-white border-slate-200 bg-white text-portal-primary'
+      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
   }`
 }
 
@@ -50,9 +50,9 @@ export default function AdminSettingsLayout() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-3">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <nav
-          className="flex flex-wrap gap-2 sm:gap-3"
+          className="flex flex-wrap gap-1 border-b border-slate-200 px-4 pt-2"
           aria-label="Settings"
         >
           {visibleTabs.map((tab) => {
