@@ -3,6 +3,7 @@ import LoadingSpinner from '../LoadingSpinner'
 import MouLifecycleBadge from './MouLifecycleBadge'
 import PokeStatusBadge from '../PokeStatusBadge'
 import StatusBadge from '../StatusBadge'
+import { Link } from 'react-router-dom'
 import { getProposalDisplayTitle } from '../../constants/proposalTemplate'
 import { COOPERATION_MODE_LABELS } from '../../constants/proposalFilters'
 import { formatDate } from '../../utils/format'
@@ -96,7 +97,12 @@ export default function ProposalOpportunitiesTable({
                   className="max-w-[140px] truncate px-4 py-3 text-slate-600"
                   title={getPakistaniCompanyDisplay(p)}
                 >
-                  {getPakistaniCompanyDisplay(p)}
+                  <Link
+                    to={`/proposals/${p.id}`}
+                    className="font-medium text-slate-700 hover:text-portal-primary hover:underline"
+                  >
+                    {getPakistaniCompanyDisplay(p)}
+                  </Link>
                 </td>
                 <td
                   className="max-w-[140px] truncate px-4 py-3 text-slate-600"

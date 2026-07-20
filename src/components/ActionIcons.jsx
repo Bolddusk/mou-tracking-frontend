@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 const VARIANTS = {
   view: 'text-green-700 hover:bg-green-50 border-slate-200',
   edit: 'text-orange-600 hover:bg-orange-50 border-slate-200',
@@ -7,7 +9,28 @@ const VARIANTS = {
   file: 'text-blue-600 hover:bg-blue-50 border-slate-200',
 }
 
-export function IconButton({ onClick, title, variant = 'view', disabled = false, children }) {
+/**
+ * Prefer `to` for navigable actions so Ctrl/Cmd+click and middle-click open a new tab.
+ * Use `onClick` alone for non-navigation actions (approve, delete, modals).
+ */
+export function IconButton({
+  onClick,
+  to,
+  title,
+  variant = 'view',
+  disabled = false,
+  children,
+}) {
+  const className = `inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border bg-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${VARIANTS[variant]}`
+
+  if (to && !disabled) {
+    return (
+      <Link to={to} title={title} aria-label={title} className={className} onClick={onClick}>
+        {children}
+      </Link>
+    )
+  }
+
   return (
     <button
       type="button"
@@ -15,7 +38,7 @@ export function IconButton({ onClick, title, variant = 'view', disabled = false,
       aria-label={title}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border bg-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${VARIANTS[variant]}`}
+      className={className}
     >
       {children}
     </button>

@@ -358,18 +358,17 @@ export default function SectorLeadDashboard() {
 
   const renderTableActions = (p) => (
     <ActionGroup>
-      <IconButton variant="view" title="View details" onClick={() => handleView(p.id)}>
+      <IconButton variant="view" title="View details" to={`/proposals/${p.id}`}>
         <ViewIcon />
       </IconButton>
       {p.party_a_id && (
-        <button
-          type="button"
+        <Link
+          to={profilePaths.detail(p.party_a_id)}
           title="View Party A Profile"
-          onClick={() => navigate(profilePaths.detail(p.party_a_id))}
           className="rounded-lg border border-green-200 px-2 py-1 text-[11px] font-semibold text-green-800 hover:bg-green-50"
         >
           Profile
-        </button>
+        </Link>
       )}
       {(p.status === 'submitted' || p.status === 'resubmitted') && (
         <>

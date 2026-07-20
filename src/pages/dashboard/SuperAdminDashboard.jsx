@@ -401,7 +401,7 @@ export default function SuperAdminDashboard() {
 
   const renderTableActions = (p) => (
     <ActionGroup>
-      <IconButton variant="view" title="View details" onClick={() => handleView(p.id)}>
+      <IconButton variant="view" title="View details" to={`/proposals/${p.id}`}>
         <ViewIcon />
       </IconButton>
       {p.status === 'draft' && (

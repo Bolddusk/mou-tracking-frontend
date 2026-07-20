@@ -266,7 +266,6 @@ export default function PartyADashboard() {
             renderActions={(p) => (
               <PartyACrudActions
                 proposal={p}
-                onView={(item) => navigate(`/proposals/${item.id}`)}
                 onUpdate={handleContinueDraft}
                 onDelete={setDeleteTarget}
               />

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import LoadingSpinner from '../LoadingSpinner'
 import OperationalStatusBadge from './OperationalStatusBadge'
 import { formatProposalConferenceDate, getMouConferenceRow } from '../../utils/mouConferenceFields'
@@ -40,14 +41,16 @@ export default function ProposalConferenceMouTable({
         <tbody className="divide-y divide-slate-100">
           {proposals.map((p) => {
             const row = getMouConferenceRow(p)
+            const viewPath = `/proposals/${p.id}`
             return (
-              <tr
-                key={p.id}
-                className="cursor-pointer hover:bg-slate-50/80"
-                onClick={() => onView?.(p.id)}
-              >
+              <tr key={p.id} className="hover:bg-slate-50/80">
                 <td className="max-w-[160px] truncate px-3 py-3 font-medium text-slate-800" title={row.pakistaniCompany}>
-                  {row.pakistaniCompany}
+                  <Link
+                    to={viewPath}
+                    className="text-slate-800 hover:text-portal-primary hover:underline"
+                  >
+                    {row.pakistaniCompany}
+                  </Link>
                 </td>
                 <td className="max-w-[160px] truncate px-3 py-3 text-slate-700" title={row.chineseCompany}>
                   {row.chineseCompany}
@@ -66,9 +69,7 @@ export default function ProposalConferenceMouTable({
                 <td className="whitespace-nowrap px-3 py-3 text-slate-600">
                   {formatProposalConferenceDate(p)}
                 </td>
-                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                  {renderActions?.(p)}
-                </td>
+                <td className="px-3 py-3">{renderActions?.(p)}</td>
               </tr>
             )
           })}

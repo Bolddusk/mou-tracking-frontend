@@ -129,11 +129,7 @@ export default function PartyBDashboard() {
             onOpenFile={(url, title) => setFilePreview({ url, title })}
             renderActions={(p) => (
               <ActionGroup>
-                <IconButton
-                  variant="view"
-                  title="View proposal"
-                  onClick={() => navigate(`/proposals/${p.id}`)}
-                >
+                <IconButton variant="view" title="View proposal" to={`/proposals/${p.id}`}>
                   <ViewIcon />
                 </IconButton>
               </ActionGroup>
@@ -192,7 +188,7 @@ export default function PartyBDashboard() {
                           <IconButton
                             variant="view"
                             title="Open engagement"
-                            onClick={() => navigate(`/complaints/${c.id}`)}
+                            to={`/complaints/${c.id}`}
                           >
                             <ViewIcon />
                           </IconButton>
@@ -242,7 +238,7 @@ export default function PartyBDashboard() {
                         <IconButton
                           variant="view"
                           title="View complaint"
-                          onClick={() => navigate(`/complaints/${c.id}`)}
+                          to={`/complaints/${c.id}`}
                         >
                           <ViewIcon />
                         </IconButton>

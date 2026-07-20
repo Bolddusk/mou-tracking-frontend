@@ -2,16 +2,17 @@ import { ActionGroup, DeleteIcon, EditIcon, IconButton, ViewIcon } from './Actio
 
 const CAN_EDIT = new Set(['draft', 'rejected'])
 
-export default function PartyACrudActions({ proposal, onView, onUpdate, onDelete }) {
+export default function PartyACrudActions({ proposal, onUpdate, onDelete }) {
   const status = (proposal.status || '').toLowerCase()
   const canEdit = CAN_EDIT.has(status)
   const canDelete =
     proposal?.capabilities?.can_delete === true ||
     (proposal?.capabilities?.can_delete == null && CAN_EDIT.has(status))
+  const viewPath = `/proposals/${proposal.id}`
 
   return (
     <ActionGroup>
-      <IconButton variant="view" title="Read — view details" onClick={() => onView(proposal)}>
+      <IconButton variant="view" title="Read — view details" to={viewPath}>
         <ViewIcon />
       </IconButton>
       <IconButton
