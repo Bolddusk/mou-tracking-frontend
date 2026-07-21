@@ -16,6 +16,7 @@ function normalizePaginatedListResponse(body, params = {}) {
         has_prev: false,
       },
       filters: {},
+      mou_lifecycle_counts: null,
     }
   }
 
@@ -23,6 +24,7 @@ function normalizePaginatedListResponse(body, params = {}) {
     data: Array.isArray(body?.data) ? body.data : [],
     pagination: body?.pagination ?? null,
     filters: body?.filters ?? {},
+    mou_lifecycle_counts: body?.mou_lifecycle_counts ?? null,
   }
 }
 
@@ -104,34 +106,12 @@ export async function getSectorLeadProposals(status) {
 /**
  * Paginated list for Sector Lead — GET /api/proposals/sector-lead
  * Same query params as GET /api/proposals/all (scoped to SL sector).
- * @returns {{ data: object[], pagination: object|null, filters: object }}
  */
 export async function getSectorLeadProposalsPaginated(params) {
   const resolved =
     typeof params === 'string' ? (params ? { status: params } : {}) : params || {}
   const response = await client.get('/api/proposals/sector-lead', { params: resolved })
-  const body = response.data
-
-  if (Array.isArray(body)) {
-    return {
-      data: body,
-      pagination: {
-        page: 1,
-        limit: body.length,
-        total: body.length,
-        total_pages: 1,
-        has_next: false,
-        has_prev: false,
-      },
-      filters: {},
-    }
-  }
-
-  return {
-    data: Array.isArray(body?.data) ? body.data : [],
-    pagination: body?.pagination ?? null,
-    filters: body?.filters ?? {},
-  }
+  return normalizePaginatedListResponse(response.data, resolved)
 }
 
 /** @param {string|Record<string, string|number|boolean|undefined>} [params] */
@@ -142,38 +122,24 @@ export async function getAllProposals(params) {
 
 /**
  * Paginated list for Super Admin — GET /api/proposals/all
- * @returns {{ data: object[], pagination: object|null, filters: object }}
+ * @returns {{ data: object[], pagination: object|null, filters: object, mou_lifecycle_counts: object|null }}
  */
 export async function getAllProposalsPaginated(params) {
   const resolved =
     typeof params === 'string' ? (params ? { status: params } : {}) : params || {}
   const response = await client.get('/api/proposals/all', { params: resolved })
-  const body = response.data
-
-  if (Array.isArray(body)) {
-    return {
-      data: body,
-      pagination: {
-        page: 1,
-        limit: body.length,
-        total: body.length,
-        total_pages: 1,
-        has_next: false,
-        has_prev: false,
-      },
-      filters: {},
-    }
-  }
-
-  return {
-    data: Array.isArray(body?.data) ? body.data : [],
-    pagination: body?.pagination ?? null,
-    filters: body?.filters ?? {},
-  }
+  return normalizePaginatedListResponse(response.data, resolved)
 }
 
-export async function getProposalFilterOptions() {
-  const response = await client.get('/api/proposals/filter-options')
+export async function getProposalFilterOptions(params = {}) {
+  const cleaned = {}
+  for (const [key, value] of Object.entries(params || {})) {
+    if (value == null || value === '') continue
+    cleaned[key] = value
+  }
+  const response = await client.get('/api/proposals/filter-options', {
+    params: Object.keys(cleaned).length ? cleaned : undefined,
+  })
   return response.data
 }
 
@@ -548,10 +514,56 @@ export async function deleteProposalMou(proposalId) {
   return response.data
 }
 
+/** Legacy General thread (still works while migrating to conversation inbox). */
 export async function getProposalMessages(proposalId, { limit = 50, before } = {}) {
   const params = { limit }
   if (before != null) params.before = before
   const response = await client.get(`/api/proposals/${proposalId}/messages`, { params })
+  return response.data
+}
+
+/** WhatsApp-style inbox list for one MOU. */
+export async function getProposalChatConversations(proposalId) {
+  const response = await client.get(`/api/proposals/${proposalId}/chat/conversations`)
+  return response.data
+}
+
+/** People on this MOU you can DM (excludes self). */
+export async function getProposalChatParticipants(proposalId) {
+  const response = await client.get(`/api/proposals/${proposalId}/chat/participants`)
+  return response.data
+}
+
+/** Start or open a 1:1 DM. Idempotent. */
+export async function startProposalChatConversation(proposalId, peerUserId) {
+  const response = await client.post(`/api/proposals/${proposalId}/chat/conversations`, {
+    peer_user_id: peerUserId,
+  })
+  return response.data
+}
+
+export async function getProposalChatMessages(
+  proposalId,
+  conversationId,
+  { limit = 100, before } = {},
+) {
+  const params = { limit }
+  if (before != null) params.before = before
+  const response = await client.get(
+    `/api/proposals/${proposalId}/chat/conversations/${conversationId}/messages`,
+    { params },
+  )
+  return response.data
+}
+
+/** Mark conversation as read (omit last_read_message_id = latest). */
+export async function markProposalChatRead(proposalId, conversationId, lastReadMessageId) {
+  const body =
+    lastReadMessageId != null ? { last_read_message_id: lastReadMessageId } : {}
+  const response = await client.post(
+    `/api/proposals/${proposalId}/chat/conversations/${conversationId}/read`,
+    body,
+  )
   return response.data
 }
 

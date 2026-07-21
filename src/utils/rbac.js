@@ -93,7 +93,13 @@ export function buildSidebarNavigation(rbac) {
     if (section.hideInNav) continue
 
     if (section.section === 'ADMINISTRATION') {
-      const firstTab = ADMIN_SETTINGS_TABS.find((tab) => canAny(rbac, tab.permissions))
+      // Power Admin: same views as SA, but Settings is hidden
+      if (rbac.role === ROLES.POWER_ADMIN) continue
+
+      const firstTab = ADMIN_SETTINGS_TABS.find((tab) => {
+        if (tab.superAdminOnly && rbac.role !== ROLES.SUPER_ADMIN) return false
+        return canAny(rbac, tab.permissions)
+      })
       if (firstTab) {
         sections.push({
           section: section.section,
@@ -113,6 +119,10 @@ export function buildSidebarNavigation(rbac) {
     const items = []
     for (const perm of section.permissions) {
       if (!perm.path || !can(rbac, perm.key)) continue
+      // Power Admin: no matchmaking "New Proposal" create in sidebar (Direct MOU uses nav.proposals.new_direct)
+      if (rbac.role === ROLES.POWER_ADMIN && perm.key === 'nav.matchmaking.new_proposal') {
+        continue
+      }
       items.push({
         key: perm.navKey || perm.key,
         label:
@@ -217,6 +227,7 @@ export function dashboardPathForRole(role) {
   if (role === ROLES.PARTY_B) return '/dashboard/party-b'
   if (role === ROLES.SECTOR_LEAD) return '/dashboard/sector-lead'
   if (role === ROLES.SUPER_ADMIN) return '/dashboard/super-admin'
+  if (role === ROLES.POWER_ADMIN) return '/dashboard/super-admin'
   if (role === ROLES.ADMIN) return '/dashboard/admin'
   if (role === ROLES.REGIONAL_FOCAL_POINT) return '/dashboard/regional-focal'
   if (role === ROLES.INVESTOR) return '/matchmaking/my-proposals'

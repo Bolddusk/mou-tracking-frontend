@@ -17,6 +17,7 @@ const EXECUTIVE_SUMMARY_FORM_KEYS = [
 
 const SCALAR_FORM_KEYS = [
   'sector',
+  'venture_name',
   'company_name',
   'party_b_name',
   'cooperation_mode',
@@ -36,6 +37,7 @@ export function proposalFieldsFormFromProposal(proposal) {
 
   return {
     sector: proposal?.sector || '',
+    venture_name: proposal?.venture_name || '',
     company_name: proposal?.company_name || '',
     party_b_name: proposal?.party_b_name || '',
     cooperation_mode: proposal?.cooperation_mode || '',

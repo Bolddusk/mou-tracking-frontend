@@ -1,9 +1,71 @@
+import { normalizeLoginEmail } from './proposalDisplay'
+
+/** Contact fields allowed on PATCH /party-contacts (never venture_name / title). */
+export const PARTY_CONTACT_INFO_KEYS = [
+  'entity_type',
+  'organization_name',
+  'department_ministry',
+  'contact_name',
+  'designation',
+  'email',
+  'phone',
+  'country',
+  'city',
+]
+
+/**
+ * Sparse party_*_info patch — only keys that differ from baseline.
+ * @returns {Record<string, string>|null} null when nothing changed
+ */
+export function diffPartyContactInfo(baseline = {}, current = {}) {
+  const patch = {}
+  for (const key of PARTY_CONTACT_INFO_KEYS) {
+    let next = current[key] ?? ''
+    let prev = baseline[key] ?? ''
+    if (key === 'email') {
+      next = normalizeLoginEmail(String(next))
+      prev = normalizeLoginEmail(String(prev))
+    } else {
+      next = String(next)
+      prev = String(prev)
+    }
+    if (next !== prev) patch[key] = next
+  }
+  return Object.keys(patch).length ? patch : null
+}
+
+/**
+ * Build sparse PATCH body for party contacts. Omits venture_name / title entirely.
+ * @returns {{ body: object, empty: boolean }}
+ */
+export function buildPartyContactsPatchBody({
+  showPartyA,
+  showPartyB,
+  baseline,
+  form,
+}) {
+  const body = {}
+  if (showPartyA) {
+    const a = diffPartyContactInfo(baseline?.party_a_info, form?.party_a_info)
+    if (a) body.party_a_info = a
+  }
+  if (showPartyB) {
+    const b = diffPartyContactInfo(baseline?.party_b_info, form?.party_b_info)
+    if (b) body.party_b_info = b
+  }
+  return { body, empty: Object.keys(body).length === 0 }
+}
+
 export function mergeProposalAfterPartyContacts(prev, res) {
   if (!prev) return prev
   const updated = res.proposal || {}
+  // Contacts API must not rewrite MOU title / venture — keep local values.
   return {
     ...prev,
     ...updated,
+    venture_name: prev.venture_name,
+    title: prev.title,
+    display_title: prev.display_title,
     party_a_info: { ...prev.party_a_info, ...updated.party_a_info },
     party_b_info: { ...prev.party_b_info, ...updated.party_b_info },
     party_a_id: updated.party_a_id ?? prev.party_a_id,
@@ -17,6 +79,7 @@ export function mergeProposalAfterPartyContacts(prev, res) {
     capabilities: res.capabilities ?? prev.capabilities,
   }
 }
+
 
 /** New account only — never open modal when existing_account or credentials missing. */
 export function shouldShowCredentialsModal(party) {

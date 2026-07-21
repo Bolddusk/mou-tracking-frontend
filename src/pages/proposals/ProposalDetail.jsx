@@ -42,7 +42,7 @@ import {
   getPartyContactSaveFeedback,
   mergeProposalAfterPartyContacts,
 } from '../../utils/partyContactProvision'
-import { normalizeProgressListResponse } from '../../utils/progressUpdates'
+import { normalizeProgressListResponse, resolveCanAddProgress } from '../../utils/progressUpdates'
 import { mergeProposalAfterFieldsPatch } from '../../utils/proposalFieldsPatch'
 
 const EMPTY_PROGRESS = Object.freeze({
@@ -50,6 +50,7 @@ const EMPTY_PROGRESS = Object.freeze({
   rows: [],
   columns: [],
   count: 0,
+  canAddProgress: null,
 })
 
 /** Matchmaking engagement proposals only — skip for legacy direct MOUs. */
@@ -73,6 +74,7 @@ export default function ProposalDetail() {
     isPartyB,
     isSectorLead,
     isSuperAdmin,
+    isPowerAdmin,
     isRegionalFocalPoint,
     isFocalPoint,
     dashboardPath,
@@ -128,8 +130,10 @@ export default function ProposalDetail() {
   const [credentialModal, setCredentialModal] = useState(null)
   const credentialQueueRef = useRef([])
 
-  const canReview = isSectorLead || isSuperAdmin
-  const isAdminRole = isSuperAdmin || user?.role === ROLES.ADMIN
+  // Power Admin has the same MOU action surface as Super Admin (progress, update requests, etc.)
+  const isMouAdmin = isSuperAdmin || isPowerAdmin
+  const canReview = isSectorLead || isMouAdmin
+  const isAdminRole = isMouAdmin || user?.role === ROLES.ADMIN
   const canExportReport = canReview || isAdminRole
 
   const isRfpEngagement = useMemo(() => {
@@ -148,10 +152,11 @@ export default function ProposalDetail() {
 
   const canChat = useMemo(() => {
     if (!proposal || isDealClosed) return false
-    if (proposal.capabilities?.can_view_chat) return true
+    if (proposal.capabilities?.can_view_chat === true) return true
     if (proposal.capabilities?.can_view_chat === false) return false
+    if (proposal.capabilities?.can_send_chat === true) return true
     if (proposal.status !== 'approved' || !proposal.party_b_user_id) return false
-    if (isPartyA || isPartyB || isSuperAdmin) return true
+    if (isPartyA || isPartyB || isSuperAdmin || isPowerAdmin) return true
     if (isSectorLead && user?.sector && proposal.sector === user.sector) return true
     if (isMatchmakingEngagement && (isSectorLead || isRegionalFocalPoint || isFocalPoint)) {
       return true
@@ -162,6 +167,7 @@ export default function ProposalDetail() {
     isPartyA,
     isPartyB,
     isSuperAdmin,
+    isPowerAdmin,
     isSectorLead,
     isRegionalFocalPoint,
     isFocalPoint,
@@ -188,7 +194,7 @@ export default function ProposalDetail() {
     }
     if (mouStatus === 'deal_closed') return false
     if (canUploadMou || canEditMouFields) return true
-    return isPartyA || isPartyB || isSectorLead || isSuperAdmin
+    return isPartyA || isPartyB || isSectorLead || isMouAdmin
   }, [
     canMou,
     isDirectMou,
@@ -200,7 +206,7 @@ export default function ProposalDetail() {
     isPartyA,
     isPartyB,
     isSectorLead,
-    isSuperAdmin,
+    isMouAdmin,
   ])
 
   const canCloseDeal = useMemo(() => {
@@ -209,9 +215,9 @@ export default function ProposalDetail() {
       return Boolean(proposal?.capabilities?.can_close_deal)
     }
     if (!isMatchmakingMou) return false
-    if (!isSectorLead && !isSuperAdmin) return false
+    if (!isSectorLead && !isMouAdmin) return false
     if (mouStatus !== 'signed') return false
-    if (isSuperAdmin) return true
+    if (isMouAdmin) return true
     const sector = mmMatch?.sector || proposal?.sector
     return Boolean(
       isSectorLead &&
@@ -225,7 +231,7 @@ export default function ProposalDetail() {
     proposal,
     mouStatus,
     isSectorLead,
-    isSuperAdmin,
+    isMouAdmin,
     mmMatch?.sector,
     mmMatch?.matched_by,
     user?.sector,
@@ -837,7 +843,11 @@ export default function ProposalDetail() {
   }
 
   const canCommentOnProgress =
-    (canReview || isAdminRole) && !isRfpEngagement && !isDealClosed
+    !isRfpEngagement &&
+    !isDealClosed &&
+    (proposal?.capabilities?.can_comment === true ||
+      ((canReview || isAdminRole || isPowerAdmin) &&
+        proposal?.capabilities?.can_comment !== false))
 
   const pendingPokeActivityId = useMemo(() => {
     if (proposal?.poke_status?.status !== 'pending_response') return null
@@ -879,13 +889,16 @@ export default function ProposalDetail() {
     !isRfpEngagement &&
     !isDealClosed &&
     !isArchived &&
-    proposal.capabilities?.can_add_activity !== false
+    resolveCanAddProgress(
+      progress.canAddProgress,
+      proposal.capabilities?.can_add_activity,
+    )
   const canViewUpdates =
     canTrackProgress &&
     !isRfpEngagement &&
     !isDealClosed &&
     !isArchived &&
-    (isPartyA || canReview || isAdminRole)
+    (isPartyA || canReview || isAdminRole || isPowerAdmin)
   const updateRequestStatus =
     proposal?.poke_status?.status || proposal?.capabilities?.update_request_status || 'none'
   const hasActiveUpdateRequest =
@@ -912,7 +925,7 @@ export default function ProposalDetail() {
               Edit MOU fields
             </button>
           )}
-          {canExportReport && canWriteProgress && (
+          {canExportReport && (
             <>
               <ProposalExportMenu proposalId={proposal?.id} onError={setError} />
               <button
@@ -1221,6 +1234,8 @@ export default function ProposalDetail() {
           proposal={proposal}
           actionLoading={actionLoading}
           showStaffRequestHint={canReview || isAdminRole}
+          staffCanManageUpdates={canReview || isAdminRole}
+          mouAdminCanRequest={isMouAdmin}
           onRequestUpdate={handleRequestUpdate}
           onRespond={() =>
             openActivityModal(
@@ -1475,7 +1490,7 @@ export default function ProposalDetail() {
           Comment on <strong>{progressCommentTarget?.title}</strong>. Multiple comments are
           allowed — they appear in the Comments column and expanded thread.
         </p>
-        {isSuperAdmin && progressCommentTarget?.added_by_role === 'sector_lead' && (
+        {isMouAdmin && progressCommentTarget?.added_by_role === 'sector_lead' && (
           <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             Super Admin comments on Sector Lead progress lock the row until you grant edit access.
           </p>

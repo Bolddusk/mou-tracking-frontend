@@ -193,6 +193,9 @@ export function proposalToFormPayload(form, proposalId) {
   if (proposalId) payload.proposal_id = proposalId
   payload.cooperation_mode = form.cooperation_mode || 'mou'
   if (form.conference_key) payload.conference_key = form.conference_key
+  if (form.ministry_id != null && form.ministry_id !== '') {
+    payload.ministry_id = Number(form.ministry_id)
+  }
   const conferenceName = form.conference_info?.conference_name || ''
   const exec = { ...(form.executive_summary || {}) }
   if (!hasValue(exec.sector_alignment) && hasValue(form.sector)) {

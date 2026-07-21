@@ -1,17 +1,26 @@
-/** Pakistani company column — never use party_a_name (import owner user). */
+/** Pakistani company column — prefer Party A org (same as contacts edit), never venture title. */
 export function getPakistaniCompanyDisplay(proposal) {
   if (!proposal) return '—'
-  return proposal.pakistani_company ?? proposal.company_name ?? '—'
+  return (
+    pickOrgDisplayName(
+      proposal.party_a_info?.organization_name,
+      proposal.party_a_organization,
+      proposal.pakistani_company,
+      proposal.company_name,
+    ) || '—'
+  )
 }
 
-/** Chinese company column. */
+/** Chinese company column — Party B org only (not venture_name / combined title). */
 export function getChineseCompanyDisplay(proposal) {
   if (!proposal) return '—'
   return (
-    proposal.chinese_company ??
-    proposal.party_b_info?.organization_name ??
-    proposal.party_b_name ??
-    '—'
+    pickOrgDisplayName(
+      proposal.party_b_info?.organization_name,
+      proposal.party_b_organization,
+      proposal.chinese_company,
+      proposal.party_b_name,
+    ) || '—'
   )
 }
 
@@ -36,6 +45,21 @@ export function formatUpdateRequestLabel(text) {
 
 export function normalizeLoginEmail(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : value
+}
+
+/** Combined MOU titles like "A × B" — not a single organization name. */
+function isCombinedVentureTitle(value) {
+  return /\s[×xX]\s/.test(String(value || ''))
+}
+
+function pickOrgDisplayName(...candidates) {
+  for (const raw of candidates) {
+    const value = raw != null ? String(raw).trim() : ''
+    if (!value || value === '—') continue
+    if (isCombinedVentureTitle(value)) continue
+    return value
+  }
+  return ''
 }
 
 function legacyPartyAContactItems(proposal) {
@@ -112,7 +136,8 @@ function contactItemValue(items, matchers) {
 
 /**
  * Fixed Companies-tab skeleton fields for Party A / Party B.
- * Uses contacts_display + party_*_info + profile.data when available.
+ * Company label uses the same org field as the contacts Edit modal
+ * (`party_*_info.organization_name`) — never venture_name / combined title.
  */
 export function getPartyCardSkeletonFields(proposal, side = 'a') {
   const isA = side === 'a'
@@ -121,19 +146,26 @@ export function getPartyCardSkeletonFields(proposal, side = 'a') {
   const profile = data?.profile || {}
   const user = data?.user || {}
   const items = isA ? getPartyAContactItems(proposal) : getPartyBContactItems(proposal)
-  // Contact items may omit empties — also read raw info
   const info = isA ? proposal?.party_a_info || {} : proposal?.party_b_info || {}
 
-  const company =
-    contactItemValue(items, ['company', 'organization']) ||
-    profile.company_name ||
-    (isA
-      ? proposal?.pakistani_company || proposal?.company_name || info.organization_name
-      : proposal?.chinese_company ||
-        info.organization_name ||
-        proposal?.party_b_organization ||
-        proposal?.party_b_name) ||
-    ''
+  const company = isA
+    ? pickOrgDisplayName(
+        info.organization_name,
+        proposal?.party_a_organization,
+        contactItemValue(items, ['organization']),
+        contactItemValue(items, ['company']),
+        profile.company_name,
+        proposal?.pakistani_company,
+        proposal?.company_name,
+      )
+    : pickOrgDisplayName(
+        info.organization_name,
+        proposal?.party_b_organization,
+        contactItemValue(items, ['organization']),
+        contactItemValue(items, ['company']),
+        profile.company_name,
+        proposal?.chinese_company,
+      )
 
   const contactPerson =
     contactItemValue(items, ['contact person', 'contact']) ||

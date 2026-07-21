@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import * as proposalsApi from '../../api/proposals'
+import * as ministriesApi from '../../api/ministries'
 import Alert from '../../components/Alert'
 import {
   ActionGroup,
@@ -71,7 +72,8 @@ export default function SuperAdminDashboard() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { rbac } = useAuth()
+  const { rbac, isPowerAdmin, isSuperAdmin } = useAuth()
+  const canFilterByMinistry = isSuperAdmin || isPowerAdmin
   const listScope = useMemo(() => getProposalsListScope(rbac), [rbac])
   const usesLifecycleTabs = listScope !== 'own'
   const pageTitle = useMemo(() => getOpportunitiesNavLabel(rbac), [rbac])
@@ -79,6 +81,8 @@ export default function SuperAdminDashboard() {
   const [listTabFilter, setListTabFilter] = useState('all')
   const [cooperationModeFilter, setCooperationModeFilter] = useState('')
   const [conferenceFilter, setConferenceFilter] = useState('')
+  const [ministryFilter, setMinistryFilter] = useState('')
+  const [ministries, setMinistries] = useState([])
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT)
   const [searchInput, setSearchInput] = useState('')
@@ -103,6 +107,7 @@ export default function SuperAdminDashboard() {
   const [archiveFilter, setArchiveFilter] = useState('')
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [listLifecycleCounts, setListLifecycleCounts] = useState(null)
 
   useEffect(() => {
     setDashboardView(resolveDashboardView(searchParams.get('view')))
@@ -129,27 +134,58 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     let cancelled = false
+    const filterOptsParams =
+      canFilterByMinistry && ministryFilter ? { ministry_id: ministryFilter } : {}
     proposalsApi
-      .getProposalFilterOptions()
+      .getProposalFilterOptions(filterOptsParams)
       .then((data) => {
         if (!cancelled) setFilterOptions(data)
       })
       .catch(() => {
-        if (!cancelled) setFilterOptions({ sectors: [], proposal_statuses: [], mou_lifecycle_statuses: DEFAULT_MOU_LIFECYCLE_STATUSES, cooperation_modes: [], conferences: [], sifc_categories: [] })
+        if (!cancelled)
+          setFilterOptions({
+            sectors: [],
+            proposal_statuses: [],
+            mou_lifecycle_statuses: DEFAULT_MOU_LIFECYCLE_STATUSES,
+            cooperation_modes: [],
+            conferences: [],
+            sifc_categories: [],
+          })
       })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [canFilterByMinistry, ministryFilter])
+
+  useEffect(() => {
+    if (!canFilterByMinistry) {
+      setMinistries([])
+      return
+    }
+    let cancelled = false
+    ministriesApi
+      .listMinistries()
+      .then((res) => {
+        if (!cancelled) setMinistries(res.data || [])
+      })
+      .catch(() => {
+        if (!cancelled) setMinistries([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [canFilterByMinistry])
 
   const refreshFilterOptions = useCallback(async () => {
     try {
-      const data = await proposalsApi.getProposalFilterOptions()
+      const data = await proposalsApi.getProposalFilterOptions(
+        ministryFilter ? { ministry_id: ministryFilter } : {},
+      )
       setFilterOptions(data)
     } catch {
       /* keep existing options */
     }
-  }, [])
+  }, [ministryFilter])
 
   const cooperationModeFilters = useMemo(
     () => buildCooperationModeFilters(filterOptions?.cooperation_modes),
@@ -173,10 +209,11 @@ export default function SuperAdminDashboard() {
     [filterOptions],
   )
 
-  const lifecycleCounts = useMemo(
-    () => getMouLifecycleCounts(filterOptions),
-    [filterOptions],
-  )
+  const lifecycleCounts = useMemo(() => {
+    // Prefer scoped counts from the current list response (ministry filter etc.)
+    if (listLifecycleCounts) return getMouLifecycleCounts(listLifecycleCounts)
+    return getMouLifecycleCounts(filterOptions)
+  }, [listLifecycleCounts, filterOptions])
 
   const toolbarTabFilters = useMemo(() => {
     if (usesLifecycleTabs) return dashboardTabFiltersToPills(dashboardTabFilters)
@@ -218,6 +255,7 @@ export default function SuperAdminDashboard() {
       cooperation_mode: cooperationModeFilter,
       conference_key: conferenceFilter,
       sifc_category: advancedFilters.sifcCategory,
+      ministry_id: canFilterByMinistry ? ministryFilter : '',
       q: searchQuery,
       date_from: advancedFilters.dateFrom,
       date_to: advancedFilters.dateTo,
@@ -238,6 +276,8 @@ export default function SuperAdminDashboard() {
     advancedFilters,
     cooperationModeFilter,
     conferenceFilter,
+    canFilterByMinistry,
+    ministryFilter,
     page,
     limit,
     listScope,
@@ -255,10 +295,24 @@ export default function SuperAdminDashboard() {
     usesLifecycleTabs ? listTabFilter : statusFilter,
     cooperationModeFilter,
     conferenceFilter,
+    ministryFilter,
     searchQuery,
     advancedFilters,
     archiveFilter,
   ])
+
+  // Drop stale global card totals when ministry (or other scope) changes — not on lifecycle tab flips
+  useEffect(() => {
+    setListLifecycleCounts(null)
+    setFilterOptions((prev) =>
+      prev
+        ? {
+            ...prev,
+            mou_lifecycle_counts: { all: 0, active: 0, inactive: 0, execution: 0 },
+          }
+        : prev,
+    )
+  }, [ministryFilter, conferenceFilter, cooperationModeFilter, searchQuery, advancedFilters, archiveFilter])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -267,10 +321,20 @@ export default function SuperAdminDashboard() {
       const result = await proposalsApi.getOpportunitiesListPaginated(listParams, rbac)
       setProposals(result.data)
       setPagination(result.pagination)
+      setListLifecycleCounts(result.mou_lifecycle_counts || null)
+      // Keep filter-options counts in sync when list returns scoped totals
+      if (result.mou_lifecycle_counts) {
+        setFilterOptions((prev) =>
+          prev
+            ? { ...prev, mou_lifecycle_counts: result.mou_lifecycle_counts }
+            : { mou_lifecycle_counts: result.mou_lifecycle_counts },
+        )
+      }
     } catch (err) {
       setError(getErrorMessage(err))
       setProposals([])
       setPagination(null)
+      setListLifecycleCounts(null)
     } finally {
       setLoading(false)
     }
@@ -322,6 +386,7 @@ export default function SuperAdminDashboard() {
     else setStatusFilter('')
     setCooperationModeFilter('')
     setConferenceFilter('')
+    setMinistryFilter('')
     setPage(1)
     setLimit(DEFAULT_PAGE_LIMIT)
     setAdvancedFilters(EMPTY_ADVANCED_FILTERS)
@@ -421,12 +486,26 @@ export default function SuperAdminDashboard() {
     setAdvancedFilters((prev) => ({ ...prev, [key]: value }))
   }
 
-  const renderTableActions = (p) => (
+  const renderTableActions = (p) => {
+    const caps = p.capabilities || {}
+    const canEditDraft =
+      p.status === 'draft' &&
+      caps.can_edit_fields !== false
+    const canApproveRow =
+      caps.can_approve === true ||
+      (caps.can_approve == null &&
+        (p.status === 'submitted' || p.status === 'resubmitted'))
+    const canRejectRow =
+      caps.can_reject === true ||
+      (caps.can_reject == null &&
+        (p.status === 'submitted' || p.status === 'resubmitted'))
+
+    return (
     <ActionGroup>
       <IconButton variant="view" title="View details" to={`/proposals/${p.id}`}>
         <ViewIcon />
       </IconButton>
-      {p.status === 'draft' && (
+      {canEditDraft && (
         <IconButton
           variant="edit"
           title="Edit MOUS — Party A steps + MOU detail (Step 11)"
@@ -435,15 +514,15 @@ export default function SuperAdminDashboard() {
           <EditIcon />
         </IconButton>
       )}
-      {(p.status === 'submitted' || p.status === 'resubmitted') && (
-        <>
-          <IconButton variant="approve" title="Approve" onClick={() => openApprove(p)}>
-            <ApproveIcon />
-          </IconButton>
-          <IconButton variant="reject" title="Reject" onClick={() => openReject(p)}>
-            <RejectIcon />
-          </IconButton>
-        </>
+      {canApproveRow && (
+        <IconButton variant="approve" title="Approve" onClick={() => openApprove(p)}>
+          <ApproveIcon />
+        </IconButton>
+      )}
+      {canRejectRow && (
+        <IconButton variant="reject" title="Reject" onClick={() => openReject(p)}>
+          <RejectIcon />
+        </IconButton>
       )}
       {p.capabilities?.can_delete === true && (
         <IconButton
@@ -455,7 +534,8 @@ export default function SuperAdminDashboard() {
         </IconButton>
       )}
     </ActionGroup>
-  )
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -547,6 +627,16 @@ export default function SuperAdminDashboard() {
           onConferenceChange={setConferenceFilter}
           conferences={filterOptions?.conferences || []}
           selectedConference={selectedConference}
+          ministries={canFilterByMinistry ? ministries : []}
+          ministryId={canFilterByMinistry ? ministryFilter : ''}
+          onMinistryChange={
+            canFilterByMinistry
+              ? (v) => {
+                  setMinistryFilter(v)
+                  setPage(1)
+                }
+              : undefined
+          }
           sector={advancedFilters.sector}
           onSectorChange={(v) => setAdvanced('sector', v)}
           mouLifecycle={advancedFilters.mouLifecycle}

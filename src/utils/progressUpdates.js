@@ -178,7 +178,25 @@ export function normalizeProgressListResponse(data) {
     columns,
     count,
     approvalRequired: data?.approval_required === true,
+    canAddProgress:
+      data?.can_add_progress === true
+        ? true
+        : data?.can_add_progress === false
+          ? false
+          : null,
   }
+}
+
+/**
+ * Prefer activities `can_add_progress`, then proposal `capabilities.can_add_activity`.
+ * Explicit false denies; both unset keeps legacy allow (incl. power_admin as SA).
+ */
+export function resolveCanAddProgress(listFlag, capabilityFlag) {
+  if (listFlag === true) return true
+  if (listFlag === false) return false
+  if (capabilityFlag === true) return true
+  if (capabilityFlag === false) return false
+  return true
 }
 
 export function formatProgressSource(value) {

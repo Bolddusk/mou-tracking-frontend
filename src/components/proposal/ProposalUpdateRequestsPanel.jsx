@@ -19,6 +19,10 @@ export default function ProposalUpdateRequestsPanel({
   proposal,
   actionLoading = false,
   showStaffRequestHint = false,
+  /** SA / PA / SL / Admin — same update-request actions when capability unset */
+  staffCanManageUpdates = false,
+  /** Super Admin + Power Admin — same Request for Update button (ignore false capability) */
+  mouAdminCanRequest = false,
   onRequestUpdate,
   onRespond,
   onEditResponse,
@@ -32,7 +36,13 @@ export default function ProposalUpdateRequestsPanel({
   const response = poke.party_a_response
   const pokeActivityId = poke.poke_activity_id
 
-  const canRequest = caps.can_request_update === true
+  const partyAEmailOk = caps.party_a_has_email !== false
+  const canRequest =
+    status === 'none' &&
+    partyAEmailOk &&
+    (caps.can_request_update === true ||
+      mouAdminCanRequest ||
+      (staffCanManageUpdates && caps.can_request_update !== false))
   const requestHint =
     caps.request_update_hint ||
     (caps.party_a_has_email === false
@@ -41,8 +51,16 @@ export default function ProposalUpdateRequestsPanel({
   const showEmailHint = showStaffRequestHint && status === 'none' && !canRequest && Boolean(requestHint)
   const canRespond = caps.can_respond_to_update_request === true
   const canEdit = caps.can_edit_update_response === true
-  const canPromote = caps.can_promote_update_to_progress === true
-  const canDismiss = caps.can_dismiss_update_request === true
+  const canPromote =
+    status === 'awaiting_review' &&
+    (caps.can_promote_update_to_progress === true ||
+      mouAdminCanRequest ||
+      (staffCanManageUpdates && caps.can_promote_update_to_progress !== false))
+  const canDismiss =
+    (status === 'pending_response' || status === 'awaiting_review') &&
+    (caps.can_dismiss_update_request === true ||
+      mouAdminCanRequest ||
+      (staffCanManageUpdates && caps.can_dismiss_update_request !== false))
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">

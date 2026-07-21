@@ -98,6 +98,7 @@ export default function SectorLeadDashboard() {
   )
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [listLifecycleCounts, setListLifecycleCounts] = useState(null)
 
   useEffect(() => {
     setDashboardView(resolveDashboardView(searchParams.get('view')))
@@ -189,10 +190,10 @@ export default function SectorLeadDashboard() {
     [filterOptions],
   )
 
-  const lifecycleCounts = useMemo(
-    () => getMouLifecycleCounts(filterOptions),
-    [filterOptions],
-  )
+  const lifecycleCounts = useMemo(() => {
+    if (listLifecycleCounts) return getMouLifecycleCounts(listLifecycleCounts)
+    return getMouLifecycleCounts(filterOptions)
+  }, [listLifecycleCounts, filterOptions])
 
   const toolbarTabFilters = useMemo(
     () => dashboardTabFiltersToPills(dashboardTabFilters),
@@ -249,10 +250,19 @@ export default function SectorLeadDashboard() {
       const result = await proposalsApi.getOpportunitiesListPaginated(listParams, rbac)
       setProposals(result.data)
       setPagination(result.pagination)
+      setListLifecycleCounts(result.mou_lifecycle_counts || null)
+      if (result.mou_lifecycle_counts) {
+        setFilterOptions((prev) =>
+          prev
+            ? { ...prev, mou_lifecycle_counts: result.mou_lifecycle_counts }
+            : { mou_lifecycle_counts: result.mou_lifecycle_counts },
+        )
+      }
     } catch (err) {
       setError(getErrorMessage(err))
       setProposals([])
       setPagination(null)
+      setListLifecycleCounts(null)
     } finally {
       setLoading(false)
     }

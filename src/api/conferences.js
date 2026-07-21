@@ -1,7 +1,14 @@
 import client from './client'
 
-export async function getConferences() {
-  const response = await client.get('/api/conferences')
+export async function getConferences(params = {}) {
+  const cleaned = {}
+  for (const [key, value] of Object.entries(params || {})) {
+    if (value == null || value === '') continue
+    cleaned[key] = value
+  }
+  const response = await client.get('/api/conferences', {
+    params: Object.keys(cleaned).length ? cleaned : undefined,
+  })
   return response.data
 }
 

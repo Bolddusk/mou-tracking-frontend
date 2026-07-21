@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as conferencesApi from '../../api/conferences'
+import * as ministriesApi from '../../api/ministries'
 import Alert from '../../components/Alert'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import Modal from '../../components/Modal'
@@ -10,6 +11,7 @@ const DEFAULT_ENGAGEMENT_TYPES = ['B2B', 'B2G', 'G2B', 'G2G']
 const EMPTY_FORM = {
   conference_key: '',
   name: '',
+  ministry_id: '',
   engagement_type: '',
   description: '',
   conference_date: '',
@@ -24,6 +26,7 @@ const EMPTY_FORM = {
 
 export default function ConferencesAdmin() {
   const [items, setItems] = useState([])
+  const [ministries, setMinistries] = useState([])
   const [engagementTypes, setEngagementTypes] = useState(DEFAULT_ENGAGEMENT_TYPES)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -38,8 +41,12 @@ export default function ConferencesAdmin() {
     setLoading(true)
     setError('')
     try {
-      const data = await conferencesApi.getAdminConferences()
+      const [data, ministryRes] = await Promise.all([
+        conferencesApi.getAdminConferences(),
+        ministriesApi.listMinistries().catch(() => ({ data: [] })),
+      ])
       setItems(Array.isArray(data?.conferences) ? data.conferences : [])
+      setMinistries(ministryRes?.data || [])
       if (Array.isArray(data?.engagement_types) && data.engagement_types.length) {
         setEngagementTypes(data.engagement_types)
       }
@@ -57,7 +64,10 @@ export default function ConferencesAdmin() {
 
   const openCreate = () => {
     setEditing(null)
-    setForm(EMPTY_FORM)
+    setForm({
+      ...EMPTY_FORM,
+      ministry_id: ministries[0] ? String(ministries[0].id) : '',
+    })
     setEditorOpen(true)
   }
 
@@ -66,6 +76,7 @@ export default function ConferencesAdmin() {
     setForm({
       conference_key: row.conference_key || row.key || '',
       name: row.name || '',
+      ministry_id: row.ministry_id != null ? String(row.ministry_id) : '',
       engagement_type: row.engagement_type ? String(row.engagement_type).toUpperCase() : '',
       description: row.description || '',
       conference_date: toDateInputValue(row.conference_date),
@@ -95,6 +106,10 @@ export default function ConferencesAdmin() {
       setError('Conference key is required')
       return
     }
+    if (!form.ministry_id) {
+      setError('Ministry is required')
+      return
+    }
 
     setSaving(true)
     setError('')
@@ -102,6 +117,7 @@ export default function ConferencesAdmin() {
     try {
       const body = {
         name: form.name.trim(),
+        ministry_id: Number(form.ministry_id),
         engagement_type: form.engagement_type || undefined,
         description: form.description.trim() || undefined,
         conference_date: form.conference_date || undefined,
@@ -198,6 +214,7 @@ export default function ConferencesAdmin() {
               <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Name</th>
+                  <th className="px-4 py-3 font-semibold">Ministry</th>
                   <th className="px-4 py-3 font-semibold">Key</th>
                   <th className="px-4 py-3 font-semibold">Type</th>
                   <th className="px-4 py-3 font-semibold">Order</th>
@@ -211,6 +228,9 @@ export default function ConferencesAdmin() {
                 {items.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50/80">
                     <td className="max-w-[240px] px-4 py-3 font-medium text-slate-800">{row.name}</td>
+                    <td className="max-w-[160px] truncate px-4 py-3 text-slate-600">
+                      {row.ministry?.name || row.ministry_name || '—'}
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-600">
                       {row.conference_key || row.key}
                     </td>
@@ -264,7 +284,7 @@ export default function ConferencesAdmin() {
         onConfirm={handleSave}
         confirmLabel={editing ? 'Save' : 'Create'}
         loading={saving}
-        confirmDisabled={!form.name.trim()}
+        confirmDisabled={!form.name.trim() || !form.ministry_id}
         panelClassName="max-w-2xl"
       >
         <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
@@ -276,6 +296,24 @@ export default function ConferencesAdmin() {
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
             />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">
+              Ministry <span className="text-red-500">*</span>
+            </span>
+            <select
+              value={form.ministry_id}
+              onChange={(e) => setForm((f) => ({ ...f, ministry_id: e.target.value }))}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
+              required
+            >
+              <option value="">Select ministry</option>
+              {ministries.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Conference key</span>

@@ -1,5 +1,6 @@
 const ROLE_STYLES = {
   super_admin: 'bg-slate-800 text-white border-slate-700',
+  power_admin: 'bg-teal-100 text-teal-900 border-teal-200',
   admin: 'bg-slate-100 text-slate-700 border-slate-200',
   sector_lead: 'bg-green-100 text-green-800 border-green-200',
   regional_focal_point: 'bg-purple-100 text-purple-800 border-purple-200',

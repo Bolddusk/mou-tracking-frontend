@@ -105,9 +105,14 @@ export function buildDashboardListTabFilters(filterOptions) {
   return DEFAULT_DASHBOARD_LIST_TAB_FILTERS
 }
 
-export function getMouLifecycleCounts(filterOptions) {
-  const counts = filterOptions?.mou_lifecycle_counts
-  if (counts && typeof counts === 'object') {
+export function getMouLifecycleCounts(source) {
+  const counts =
+    source?.mou_lifecycle_counts && typeof source.mou_lifecycle_counts === 'object'
+      ? source.mou_lifecycle_counts
+      : source && typeof source === 'object' && ('all' in source || 'active' in source)
+        ? source
+        : null
+  if (counts) {
     return { ...DEFAULT_MOU_LIFECYCLE_COUNTS, ...counts }
   }
   return { ...DEFAULT_MOU_LIFECYCLE_COUNTS }
@@ -161,6 +166,7 @@ export function buildProposalListParams({
   cooperation_mode = '',
   conference_key = '',
   sifc_category = '',
+  ministry_id = '',
   q = '',
   date_from = '',
   date_to = '',
@@ -176,6 +182,7 @@ export function buildProposalListParams({
   if (cooperation_mode) params.cooperation_mode = cooperation_mode
   if (conference_key) params.conference_key = conference_key
   if (sifc_category) params.sifc_category = sifc_category
+  if (ministry_id) params.ministry_id = ministry_id
   const trimmedQ = q?.trim()
   if (trimmedQ) params.q = trimmedQ
   if (date_from) params.date_from = date_from

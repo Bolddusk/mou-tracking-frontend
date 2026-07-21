@@ -8,6 +8,8 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import UserRoleBadge from '../../components/UserRoleBadge'
 import { ROLES } from '../../constants/sectors'
 import { getPartyAProfilePaths, getPartyBProfilePaths } from '../../constants/profileRoutes'
+import { useAuth } from '../../context/AuthContext'
+import * as ministriesApi from '../../api/ministries'
 import { formatDate, getErrorMessage } from '../../utils/format'
 
 function PartyAProfileStatusBadge({ user, profileMeta }) {
@@ -38,35 +40,91 @@ function PartyAProfileStatusBadge({ user, profileMeta }) {
   )
 }
 
+function mergeTabs(fromList, fromTabsEndpoint) {
+  const byKey = new Map()
+  for (const t of usersApi.USER_LIST_TABS) {
+    byKey.set(t.key, { ...t, count: null })
+  }
+  for (const t of fromTabsEndpoint || []) {
+    if (!t?.key) continue
+    byKey.set(t.key, {
+      key: t.key,
+      label: t.label || byKey.get(t.key)?.label || t.key,
+      count: t.count ?? byKey.get(t.key)?.count,
+    })
+  }
+  for (const t of fromList || []) {
+    if (!t?.key) continue
+    const prev = byKey.get(t.key) || { key: t.key, label: t.label || t.key, count: null }
+    byKey.set(t.key, {
+      ...prev,
+      label: t.label || prev.label,
+      count: t.count ?? prev.count,
+    })
+  }
+  return usersApi.USER_LIST_TABS.map((t) => byKey.get(t.key)).filter(Boolean)
+}
+
 export default function UsersList() {
   const navigate = useNavigate()
   const location = useLocation()
   const [users, setUsers] = useState([])
+  const [tabs, setTabs] = useState(() =>
+    usersApi.USER_LIST_TABS.map((t) => ({ ...t, count: null })),
+  )
+  const [total, setTotal] = useState(0)
   const [profileByUserId, setProfileByUserId] = useState({})
-  const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(location.state?.success || '')
-  const [roleFilter, setRoleFilter] = useState('')
+  const [activeTab, setActiveTab] = useState('party_a')
   const [search, setSearch] = useState('')
+  const [ministryFilter, setMinistryFilter] = useState('')
+  const [ministries, setMinistries] = useState([])
+  const { isSuperAdmin, isPowerAdmin, isGlobal } = useAuth()
 
   const partyAProfilePaths = getPartyAProfilePaths(ROLES.SUPER_ADMIN)
   const partyBProfilePaths = getPartyBProfilePaths(ROLES.SUPER_ADMIN)
+
+  useEffect(() => {
+    usersApi
+      .getUserTabs()
+      .then((res) => {
+        const list = Array.isArray(res?.tabs) ? res.tabs : Array.isArray(res) ? res : []
+        if (list.length) setTabs((prev) => mergeTabs(prev, list))
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!isGlobal) return
+    ministriesApi
+      .listMinistries()
+      .then((res) => setMinistries(res.data || []))
+      .catch(() => setMinistries([]))
+  }, [isGlobal])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const params = {}
-      if (roleFilter) params.role = roleFilter
+      const params = { tab: activeTab }
       if (search.trim()) params.search = search.trim()
+      if (ministryFilter) params.ministry_id = ministryFilter
 
-      const [usersData, profilesData] = await Promise.all([
+      const [usersBody, profilesData] = await Promise.all([
         usersApi.listUsers(params),
-        profileApi.getPartyAProfiles().catch(() => ({ profiles: [] })),
+        activeTab === 'party_a'
+          ? profileApi.getPartyAProfiles().catch(() => ({ profiles: [] }))
+          : Promise.resolve({ profiles: [] }),
       ])
 
-      setUsers(Array.isArray(usersData) ? usersData : [])
+      const normalized = usersApi.normalizeUsersListResponse(usersBody)
+      setUsers(normalized.data)
+      setTotal(normalized.total)
+      if (normalized.tabs.length) {
+        setTabs((prev) => mergeTabs(normalized.tabs, prev))
+      }
 
       const map = {}
       for (const p of profilesData.profiles || []) {
@@ -75,14 +133,12 @@ export default function UsersList() {
       setProfileByUserId(map)
     } catch (err) {
       setError(getErrorMessage(err))
+      setUsers([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }
-  }, [roleFilter, search])
-
-  useEffect(() => {
-    usersApi.getUserRoles().then((r) => setRoles(Array.isArray(r) ? r : [])).catch(() => {})
-  }, [])
+  }, [activeTab, search, ministryFilter])
 
   useEffect(() => {
     const t = setTimeout(load, search ? 300 : 0)
@@ -96,16 +152,18 @@ export default function UsersList() {
   }, [location.pathname, location.state, navigate])
 
   const partyAStats = useMemo(() => {
-    const partyAUsers = users.filter((u) => u.role === ROLES.PARTY_A)
+    if (activeTab !== 'party_a') return null
     let complete = 0
     let incomplete = 0
-    for (const u of partyAUsers) {
+    for (const u of users) {
       const meta = profileByUserId[u.id]
       if (meta?.profile_complete) complete++
       else incomplete++
     }
-    return { total: partyAUsers.length, complete, incomplete }
-  }, [users, profileByUserId])
+    return { total: users.length, complete, incomplete }
+  }, [users, profileByUserId, activeTab])
+
+  const showPartyAProfileCol = activeTab === 'party_a'
 
   return (
     <div className="space-y-6">
@@ -125,112 +183,166 @@ export default function UsersList() {
       <Alert type="error" message={error} onClose={() => setError('')} />
       <Alert type="success" message={success} onClose={() => setSuccess('')} />
 
-      {partyAStats.total > 0 && (
-        <p className="text-sm text-slate-600">
-          Party A profiles:{' '}
-          <span className="font-semibold text-green-700">{partyAStats.complete} complete</span>
-          {' · '}
-          <span className="font-semibold text-amber-700">{partyAStats.incomplete} incomplete</span>
-        </p>
-      )}
-
-      <div className="flex flex-wrap gap-3">
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-        >
-          <option value="">All roles</option>
-          {roles.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search name, email, organization…"
-          className="min-w-[220px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-        />
-      </div>
-
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <LoadingSpinner size="lg" />
-          </div>
-        ) : users.length === 0 ? (
-          <div className="py-16 text-center text-slate-500">No users match your filters.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-[960px] w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Name</th>
-                  <th className="px-4 py-3 font-semibold">Email</th>
-                  <th className="px-4 py-3 font-semibold">Role</th>
-                  <th className="px-4 py-3 font-semibold">Sector</th>
-                  <th className="px-4 py-3 font-semibold">Organization</th>
-                  <th className="px-4 py-3 font-semibold">Party A Profile</th>
-                  <th className="px-4 py-3 font-semibold">Created</th>
-                  <th className="px-4 py-3 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/80">
-                    <td className="px-4 py-3 font-medium text-slate-800">{u.full_name}</td>
-                    <td className="px-4 py-3 text-slate-600">{u.email}</td>
-                    <td className="px-4 py-3">
-                      <UserRoleBadge role={u.role} label={u.role_label} />
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{u.sector || '—'}</td>
-                    <td className="max-w-[140px] truncate px-4 py-3 text-slate-600">
-                      {u.organization || '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <PartyAProfileStatusBadge user={u} profileMeta={profileByUserId[u.id]} />
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{formatDate(u.created_at)}</td>
-                    <td className="px-4 py-3">
-                      <ActionGroup>
-                        <IconButton
-                          variant="view"
-                          title="View user"
-                          onClick={() => navigate(`/admin/users/${u.id}`)}
-                        >
-                          <ViewIcon />
-                        </IconButton>
-                        {u.role === ROLES.PARTY_A && (
-                          <button
-                            type="button"
-                            title="View Party A Profile"
-                            onClick={() => navigate(partyAProfilePaths.detail(u.id))}
-                            className="rounded-lg border border-green-200 px-2.5 py-1 text-[11px] font-semibold text-green-800 hover:bg-green-50"
-                          >
-                            View Profile
-                          </button>
-                        )}
-                        {u.role === ROLES.PARTY_B && (
-                          <button
-                            type="button"
-                            title="View Party B Profile"
-                            onClick={() => navigate(partyBProfilePaths.detail(u.id))}
-                            className="rounded-lg border border-green-200 px-2.5 py-1 text-[11px] font-semibold text-green-800 hover:bg-green-50"
-                          >
-                            View Profile
-                          </button>
-                        )}
-                      </ActionGroup>
-                    </td>
-                  </tr>
+        <nav
+          className="flex flex-wrap gap-1 border-b border-slate-200 px-4 pt-2"
+          aria-label="User roles"
+        >
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.key
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`rounded-t-lg px-4 py-2.5 text-sm font-semibold transition ${
+                  isActive
+                    ? 'border border-b-white border-slate-200 bg-white text-portal-primary'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                }`}
+              >
+                {tab.label}
+                {tab.count != null && (
+                  <span
+                    className={`ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                      isActive
+                        ? 'bg-emerald-50 text-emerald-800'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </nav>
+
+        <div className="space-y-4 p-4">
+          {partyAStats && (
+            <p className="text-sm text-slate-600">
+              Party A profiles:{' '}
+              <span className="font-semibold text-green-700">{partyAStats.complete} complete</span>
+              {' · '}
+              <span className="font-semibold text-amber-700">
+                {partyAStats.incomplete} incomplete
+              </span>
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3">
+            {(isSuperAdmin || isPowerAdmin || isGlobal) && ministries.length > 0 && (
+              <select
+                value={ministryFilter}
+                onChange={(e) => setMinistryFilter(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">All ministries</option>
+                {ministries.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
                 ))}
-              </tbody>
-            </table>
+              </select>
+            )}
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name, email, organization…"
+              className="min-w-[220px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-portal-primary focus:ring-2 focus:ring-portal-primary/30"
+            />
+            <p className="text-xs text-slate-500">
+              {loading ? 'Loading…' : `${total} user${total === 1 ? '' : 's'}`}
+            </p>
           </div>
-        )}
+
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <LoadingSpinner size="lg" />
+            </div>
+          ) : users.length === 0 ? (
+            <div className="py-16 text-center text-slate-500">No users in this tab.</div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-slate-100">
+              <table className="min-w-[960px] w-full text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Name</th>
+                    <th className="px-4 py-3 font-semibold">Email</th>
+                    <th className="px-4 py-3 font-semibold">Role</th>
+                    <th className="px-4 py-3 font-semibold">Ministry</th>
+                    <th className="px-4 py-3 font-semibold">Sector</th>
+                    <th className="px-4 py-3 font-semibold">Organization</th>
+                    {showPartyAProfileCol && (
+                      <th className="px-4 py-3 font-semibold">Party A Profile</th>
+                    )}
+                    <th className="px-4 py-3 font-semibold">Created</th>
+                    <th className="px-4 py-3 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {users.map((u) => (
+                    <tr key={u.id} className="hover:bg-slate-50/80">
+                      <td className="px-4 py-3 font-medium text-slate-800">{u.full_name}</td>
+                      <td className="px-4 py-3 text-slate-600">{u.email}</td>
+                      <td className="px-4 py-3">
+                        <UserRoleBadge role={u.role} label={u.role_label} />
+                      </td>
+                      <td className="max-w-[160px] truncate px-4 py-3 text-slate-600">
+                        {u.ministry?.name || u.ministry_name || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{u.sector || '—'}</td>
+                      <td className="max-w-[140px] truncate px-4 py-3 text-slate-600">
+                        {u.organization || '—'}
+                      </td>
+                      {showPartyAProfileCol && (
+                        <td className="px-4 py-3">
+                          <PartyAProfileStatusBadge
+                            user={u}
+                            profileMeta={profileByUserId[u.id]}
+                          />
+                        </td>
+                      )}
+                      <td className="px-4 py-3 text-slate-600">{formatDate(u.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <ActionGroup>
+                          <IconButton
+                            variant="view"
+                            title="View user"
+                            onClick={() => navigate(`/admin/users/${u.id}`)}
+                          >
+                            <ViewIcon />
+                          </IconButton>
+                          {u.role === ROLES.PARTY_A && (
+                            <button
+                              type="button"
+                              title="View Party A Profile"
+                              onClick={() => navigate(partyAProfilePaths.detail(u.id))}
+                              className="rounded-lg border border-green-200 px-2.5 py-1 text-[11px] font-semibold text-green-800 hover:bg-green-50"
+                            >
+                              View Profile
+                            </button>
+                          )}
+                          {u.role === ROLES.PARTY_B && (
+                            <button
+                              type="button"
+                              title="View Party B Profile"
+                              onClick={() => navigate(partyBProfilePaths.detail(u.id))}
+                              className="rounded-lg border border-green-200 px-2.5 py-1 text-[11px] font-semibold text-green-800 hover:bg-green-50"
+                            >
+                              View Profile
+                            </button>
+                          )}
+                        </ActionGroup>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -1,5 +1,6 @@
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ADMIN_SETTINGS_TABS } from '../../constants/adminSettings'
+import { ROLES } from '../../constants/sectors'
 import { useAuth } from '../../context/AuthContext'
 import { canAny } from '../../utils/rbac'
 
@@ -18,18 +19,30 @@ function settingsTabClass(isActive) {
   }`
 }
 
+function isTabVisible(tab, rbac) {
+  if (tab.superAdminOnly && rbac?.role !== ROLES.SUPER_ADMIN) return false
+  return canAny(rbac, tab.permissions)
+}
+
 export function AdminSettingsDefaultRedirect() {
-  const { rbac } = useAuth()
-  const first = ADMIN_SETTINGS_TABS.find((tab) => canAny(rbac, tab.permissions))
+  const { rbac, isPowerAdmin, dashboardPath } = useAuth()
+  if (isPowerAdmin || rbac?.role === ROLES.POWER_ADMIN) {
+    return <Navigate to={dashboardPath || '/dashboard/super-admin'} replace />
+  }
+  const first = ADMIN_SETTINGS_TABS.find((tab) => isTabVisible(tab, rbac))
   if (!first) return <Navigate to="/unauthorized" replace />
   return <Navigate to={first.path} replace />
 }
 
 export default function AdminSettingsLayout() {
-  const { rbac } = useAuth()
+  const { rbac, isPowerAdmin, dashboardPath } = useAuth()
   const location = useLocation()
 
-  const visibleTabs = ADMIN_SETTINGS_TABS.filter((tab) => canAny(rbac, tab.permissions))
+  if (isPowerAdmin || rbac?.role === ROLES.POWER_ADMIN) {
+    return <Navigate to={dashboardPath || '/dashboard/super-admin'} replace />
+  }
+
+  const visibleTabs = ADMIN_SETTINGS_TABS.filter((tab) => isTabVisible(tab, rbac))
 
   if (!visibleTabs.length) {
     return <Navigate to="/unauthorized" replace />
@@ -76,8 +89,14 @@ export default function AdminSettingsLayout() {
   )
 }
 
-export function AdminSettingsTab({ permissions, children }) {
-  const { rbac } = useAuth()
+export function AdminSettingsTab({ permissions, children, superAdminOnly = false }) {
+  const { rbac, isPowerAdmin, dashboardPath } = useAuth()
+  if (isPowerAdmin || rbac?.role === ROLES.POWER_ADMIN) {
+    return <Navigate to={dashboardPath || '/dashboard/super-admin'} replace />
+  }
+  if (superAdminOnly && rbac?.role !== ROLES.SUPER_ADMIN) {
+    return <Navigate to="/admin/settings" replace />
+  }
   if (!canAny(rbac, permissions)) {
     return <Navigate to="/admin/settings" replace />
   }

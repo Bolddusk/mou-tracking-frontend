@@ -9,7 +9,12 @@ import { ROLES } from '../../constants/sectors'
 import { getErrorMessage } from '../../utils/format'
 import { buildConferenceReportParams } from '../../utils/conferenceReportQuery'
 
-const REPORT_ROLES = new Set([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.SECTOR_LEAD])
+const REPORT_ROLES = new Set([
+  ROLES.SUPER_ADMIN,
+  ROLES.POWER_ADMIN,
+  ROLES.ADMIN,
+  ROLES.SECTOR_LEAD,
+])
 
 const FILTER_SEARCH_KEYS = [
   'sector',

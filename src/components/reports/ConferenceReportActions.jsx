@@ -58,33 +58,35 @@ export default function ConferenceReportActions({
   const scopeLabel = isAllConferences ? 'All conferences' : conferenceName || key
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      <Link
-        to={previewTo}
-        className="inline-flex items-center rounded-lg bg-green-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-900"
-      >
-        Preview SIFC report
-      </Link>
-      <button
-        type="button"
-        onClick={handlePdf}
-        disabled={busy}
-        className="inline-flex items-center rounded-lg border border-green-700/40 bg-white px-3 py-1.5 text-xs font-semibold text-green-900 hover:bg-green-50 disabled:opacity-60"
-      >
-        {pdfLoading ? 'Opening PDF…' : 'Download SIFC report (PDF)'}
-      </button>
-      <button
-        type="button"
-        onClick={handleXlsx}
-        disabled={busy}
-        className="inline-flex items-center rounded-lg border border-green-700/40 bg-white px-3 py-1.5 text-xs font-semibold text-green-900 hover:bg-green-50 disabled:opacity-60"
-      >
-        {xlsxLoading ? 'Preparing Excel…' : 'Download SIFC report (Excel)'}
-      </button>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-green-100 bg-white/70 px-3 py-2">
       <span className="text-[11px] text-slate-500">
-        Report for {scopeLabel}
-        {filterHint ? ' (matches table filters)' : ''}
+        SIFC report · {scopeLabel}
+        {filterHint ? ' (table filters)' : ''}
       </span>
+      <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
+        <Link
+          to={previewTo}
+          className="inline-flex items-center rounded-md border border-green-700/30 bg-white px-2.5 py-1 text-xs font-semibold text-green-900 hover:bg-green-50"
+        >
+          Preview
+        </Link>
+        <button
+          type="button"
+          onClick={handlePdf}
+          disabled={busy}
+          className="inline-flex items-center rounded-md border border-green-700/30 bg-white px-2.5 py-1 text-xs font-semibold text-green-900 hover:bg-green-50 disabled:opacity-60"
+        >
+          {pdfLoading ? 'PDF…' : 'PDF'}
+        </button>
+        <button
+          type="button"
+          onClick={handleXlsx}
+          disabled={busy}
+          className="inline-flex items-center rounded-md border border-green-700/30 bg-white px-2.5 py-1 text-xs font-semibold text-green-900 hover:bg-green-50 disabled:opacity-60"
+        >
+          {xlsxLoading ? 'Excel…' : 'Excel'}
+        </button>
+      </div>
     </div>
   )
 }

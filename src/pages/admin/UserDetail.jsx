@@ -85,7 +85,10 @@ export default function UserDetail() {
   }, [load])
 
   useEffect(() => {
-    usersApi.getUserRoles().then((r) => setRoles(Array.isArray(r) ? r : [])).catch(() => {})
+    usersApi
+      .getUserRoles()
+      .then((r) => setRoles(usersApi.parseAssignableUserRoles(r)))
+      .catch(() => {})
   }, [])
 
   const selectedRoleMeta = useMemo(
@@ -94,13 +97,11 @@ export default function UserDetail() {
   )
 
   const roleNeedsSector = selectedRoleMeta?.requires_sector
-  const userNeedsSector =
-    user && ['sector_lead', 'regional_focal_point'].includes(user.role)
+  const userNeedsSector = user && user.role === 'sector_lead'
   const isSelf = Number(currentUser?.id) === Number(user?.id)
   const isPartyA = user?.role === 'party_a' || user?.role === ROLES.PARTY_A
   const isPartyB = user?.role === 'party_b' || user?.role === ROLES.PARTY_B
-  const isPartyLoginRole =
-    isPartyA || isPartyB || user?.role === ROLES.INVESTOR || user?.role === 'investor'
+  const isPartyLoginRole = isPartyA || isPartyB
   const hasRecords = hasPortalRecords(user?.stats)
   const canDelete = user && !isSelf && (!hasRecords || isPartyB)
   const deleteWithUnlink = isPartyB || deleteUnlinkMode
@@ -339,7 +340,7 @@ export default function UserDetail() {
               View Party A Profile
             </Link>
           )}
-          {(user.role === ROLES.PARTY_B || user.role === ROLES.INVESTOR) && (
+          {user.role === ROLES.PARTY_B && (
             <Link
               to={partyBProfilePaths.detail(user.id)}
               className="rounded-lg bg-portal-primary px-4 py-2 text-sm font-semibold text-white hover:bg-portal-primary-hover"
@@ -439,22 +440,20 @@ export default function UserDetail() {
           <Input label="Full Name" value={editForm.full_name} onChange={(v) => setEditForm((f) => ({ ...f, full_name: v }))} />
           <Input label="Email" value={editForm.email} onChange={(v) => setEditForm((f) => ({ ...f, email: v }))} />
           {userNeedsSector && (
-            user.role === 'sector_lead' ? (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Sector</label>
-                <select
-                  value={editForm.sector}
-                  onChange={(e) => setEditForm((f) => ({ ...f, sector: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                >
-                  {sectors.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <Input label="Region" value={editForm.sector} onChange={(v) => setEditForm((f) => ({ ...f, sector: v }))} />
-            )
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Sector</label>
+              <select
+                value={editForm.sector}
+                onChange={(e) => setEditForm((f) => ({ ...f, sector: e.target.value }))}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                {sectors.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
           <Input label="Organization" value={editForm.organization} onChange={(v) => setEditForm((f) => ({ ...f, organization: v }))} />
           <Input label="Phone" value={editForm.phone} onChange={(v) => setEditForm((f) => ({ ...f, phone: v }))} />
@@ -484,26 +483,20 @@ export default function UserDetail() {
             </select>
           </div>
           {roleNeedsSector && (
-            roleForm.role === 'sector_lead' ? (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Sector</label>
-                <select
-                  value={roleForm.sector}
-                  onChange={(e) => setRoleForm((f) => ({ ...f, sector: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                >
-                  {sectors.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <Input
-                label="Region"
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Sector</label>
+              <select
                 value={roleForm.sector}
-                onChange={(v) => setRoleForm((f) => ({ ...f, sector: v }))}
-              />
-            )
+                onChange={(e) => setRoleForm((f) => ({ ...f, sector: e.target.value }))}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                {sectors.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
           {isSelf && roleForm.role !== 'super_admin' && (
             <p className="text-xs text-amber-700">You cannot remove your own super admin role.</p>

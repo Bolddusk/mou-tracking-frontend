@@ -35,6 +35,7 @@ import UserDetail from './pages/admin/UserDetail'
 import PermissionsAdmin from './pages/admin/PermissionsAdmin'
 import SectorsAdmin from './pages/admin/SectorsAdmin'
 import ConferencesAdmin from './pages/admin/ConferencesAdmin'
+import MinistriesAdmin from './pages/admin/MinistriesAdmin'
 import SifcCategoriesAdmin from './pages/admin/SifcCategoriesAdmin'
 import SectorLeadReassign from './pages/admin/SectorLeadReassign'
 import SectorLeadHandoff from './pages/admin/SectorLeadHandoff'
@@ -329,6 +330,17 @@ export default function App() {
                 element={
                   <AdminSettingsTab permissions={getAdminSettingsTab('users').permissions}>
                     <UsersList />
+                  </AdminSettingsTab>
+                }
+              />
+              <Route
+                path="ministries"
+                element={
+                  <AdminSettingsTab
+                    permissions={getAdminSettingsTab('ministries').permissions}
+                    superAdminOnly
+                  >
+                    <MinistriesAdmin />
                   </AdminSettingsTab>
                 }
               />

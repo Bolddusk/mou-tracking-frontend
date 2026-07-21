@@ -91,6 +91,7 @@ export const EMPTY_PROPOSAL_FORM = {
   sector: SECTORS[0],
   project_type: PROJECT_TYPES[0],
   venture_name: '',
+  ministry_id: '',
   executive_summary: {
     company_overview: '',
     project_overview: '',

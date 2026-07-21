@@ -9,6 +9,14 @@ export const ADMIN_SETTINGS_TABS = [
     permissions: ['nav.users.manage', 'admin.users', 'users.manage'],
   },
   {
+    id: 'ministries',
+    label: 'Ministries',
+    path: '/admin/settings/ministries',
+    permission: 'nav.users.manage',
+    permissions: ['nav.users.manage', 'admin.users', 'users.manage'],
+    superAdminOnly: true,
+  },
+  {
     id: 'sectors',
     label: 'Sectors',
     path: '/admin/settings/sectors',

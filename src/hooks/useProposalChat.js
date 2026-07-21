@@ -21,8 +21,32 @@ function mergeOlderMessages(prev, older) {
   })
 }
 
-export function useProposalChat(proposalId, token, enabled = true) {
+function sameConversation(msgConversationId, activeId) {
+  if (activeId == null) return msgConversationId == null
+  return Number(msgConversationId) === Number(activeId)
+}
+
+/**
+ * Socket chat for one MOU conversation.
+ * @param {number|string} proposalId
+ * @param {string} token
+ * @param {boolean} enabled
+ * @param {number|null} conversationId — required for inbox; omit/null = legacy General join
+ * @param {{ onConversationsUpdated?: Function }} options
+ */
+export function useProposalChat(
+  proposalId,
+  token,
+  enabled = true,
+  conversationId = null,
+  options = {},
+) {
+  const { onConversationsUpdated } = options
   const socketRef = useRef(null)
+  const conversationIdRef = useRef(conversationId)
+  const onUpdatedRef = useRef(onConversationsUpdated)
+  const previousConversationRef = useRef(null)
+
   const [messages, setMessages] = useState([])
   const [online, setOnline] = useState([])
   const [connected, setConnected] = useState(false)
@@ -32,18 +56,26 @@ export function useProposalChat(proposalId, token, enabled = true) {
   const [typingUser, setTypingUser] = useState(null)
   const [proposalTitle, setProposalTitle] = useState('')
   const [canSend, setCanSend] = useState(true)
+  const [joinedConversationId, setJoinedConversationId] = useState(null)
+  const [conversationType, setConversationType] = useState(null)
 
+  useEffect(() => {
+    conversationIdRef.current = conversationId
+  }, [conversationId])
+
+  useEffect(() => {
+    onUpdatedRef.current = onConversationsUpdated
+  }, [onConversationsUpdated])
+
+  // Connect socket once per enabled proposal
   useEffect(() => {
     if (!enabled || !proposalId || !token) return undefined
 
     setError(null)
-    setMessages([])
-    setOnline([])
-    setHasMore(false)
-    setTypingUser(null)
-    setCanSend(true)
+    setConnected(false)
 
     const socket = io(SOCKET_URL, {
+      path: '/socket.io',
       auth: { token },
       transports: ['websocket', 'polling'],
     })
@@ -52,7 +84,10 @@ export function useProposalChat(proposalId, token, enabled = true) {
     socket.on('connect', () => {
       setConnected(true)
       setError(null)
-      socket.emit('chat:join', { proposalId })
+      const activeId = conversationIdRef.current
+      if (activeId != null) {
+        socket.emit('chat:join', { proposalId, conversationId: Number(activeId) })
+      }
     })
 
     socket.on('disconnect', () => setConnected(false))
@@ -66,21 +101,37 @@ export function useProposalChat(proposalId, token, enabled = true) {
       setOnline(data.online || [])
       if (data.proposalTitle) setProposalTitle(data.proposalTitle)
       if (typeof data.canSend === 'boolean') setCanSend(data.canSend)
+      if (data.conversationId != null) setJoinedConversationId(Number(data.conversationId))
+      if (data.type) setConversationType(data.type)
       const history = data.messages || []
       setMessages(history)
       setHasMore(history.length >= JOIN_HISTORY_LIMIT)
+      setTypingUser(null)
     })
 
     socket.on('chat:message', (msg) => {
+      if (!sameConversation(msg.conversationId, conversationIdRef.current)) return
       setMessages((prev) => appendMessage(prev, msg))
       setTypingUser(null)
     })
 
     socket.on('chat:presence', (data) => {
+      if (
+        data.conversationId != null &&
+        !sameConversation(data.conversationId, conversationIdRef.current)
+      ) {
+        return
+      }
       setOnline(data.online || [])
     })
 
     socket.on('chat:typing', (data) => {
+      if (
+        data.conversationId != null &&
+        !sameConversation(data.conversationId, conversationIdRef.current)
+      ) {
+        return
+      }
       if (data.isTyping) {
         setTypingUser(data.fullName || 'Someone')
       } else {
@@ -88,51 +139,96 @@ export function useProposalChat(proposalId, token, enabled = true) {
       }
     })
 
+    socket.on('chat:conversations_updated', (payload) => {
+      onUpdatedRef.current?.(payload)
+    })
+
     socket.on('chat:error', (err) => {
       setError(err.message || 'Chat error')
     })
 
     return () => {
-      socket.emit('chat:leave', { proposalId })
+      const activeId = conversationIdRef.current
+      if (activeId != null) {
+        socket.emit('chat:leave', { proposalId, conversationId: Number(activeId) })
+      } else {
+        socket.emit('chat:leave', { proposalId })
+      }
       socket.disconnect()
       socketRef.current = null
+      previousConversationRef.current = null
     }
   }, [proposalId, token, enabled])
 
+  // Switch conversation room when selection changes
+  useEffect(() => {
+    if (!enabled || !proposalId || !socketRef.current) return
+    if (conversationId == null) return
+
+    const socket = socketRef.current
+    const nextId = Number(conversationId)
+    const prevId = previousConversationRef.current
+
+    if (prevId != null && prevId !== nextId) {
+      socket.emit('chat:leave', { proposalId, conversationId: prevId })
+    }
+
+    setMessages([])
+    setOnline([])
+    setHasMore(false)
+    setTypingUser(null)
+    setError(null)
+
+    if (socket.connected) {
+      socket.emit('chat:join', { proposalId, conversationId: nextId })
+    }
+    previousConversationRef.current = nextId
+  }, [proposalId, conversationId, enabled])
+
   const loadOlder = useCallback(async () => {
-    if (!messages.length || loadingOlder) return
+    if (!messages.length || loadingOlder || conversationId == null) return
     setLoadingOlder(true)
     setError(null)
     try {
       const before = messages[0].id
-      const data = await proposalsApi.getProposalMessages(proposalId, {
+      const data = await proposalsApi.getProposalChatMessages(proposalId, conversationId, {
         limit: OLDER_PAGE_LIMIT,
         before,
       })
       setHasMore(Boolean(data.hasMore))
+      if (typeof data.canSend === 'boolean') setCanSend(data.canSend)
       setMessages((prev) => mergeOlderMessages(prev, data.messages))
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to load older messages')
     } finally {
       setLoadingOlder(false)
     }
-  }, [messages, proposalId, loadingOlder])
+  }, [messages, proposalId, conversationId, loadingOlder])
 
   const sendMessage = useCallback(
     (text) => {
       const trimmed = text.trim()
-      if (!trimmed || !socketRef.current || !canSend) return false
-      socketRef.current.emit('chat:message', { proposalId, text: trimmed })
+      if (!trimmed || !socketRef.current || !canSend || conversationId == null) return false
+      socketRef.current.emit('chat:message', {
+        proposalId,
+        conversationId: Number(conversationId),
+        text: trimmed,
+      })
       return true
     },
-    [proposalId, canSend],
+    [proposalId, conversationId, canSend],
   )
 
   const setTyping = useCallback(
     (isTyping) => {
-      socketRef.current?.emit('chat:typing', { proposalId, isTyping })
+      if (conversationId == null) return
+      socketRef.current?.emit('chat:typing', {
+        proposalId,
+        conversationId: Number(conversationId),
+        isTyping,
+      })
     },
-    [proposalId],
+    [proposalId, conversationId],
   )
 
   return {
@@ -145,6 +241,8 @@ export function useProposalChat(proposalId, token, enabled = true) {
     typingUser,
     proposalTitle,
     canSend,
+    joinedConversationId,
+    conversationType,
     sendMessage,
     setTyping,
     loadOlder,

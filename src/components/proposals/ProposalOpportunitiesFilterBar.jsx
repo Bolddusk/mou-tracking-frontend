@@ -39,6 +39,9 @@ export default function ProposalOpportunitiesFilterBar({
   onConferenceChange,
   conferences = [],
   selectedConference,
+  ministries = [],
+  ministryId = '',
+  onMinistryChange,
   sector,
   onSectorChange,
   mouLifecycle,
@@ -68,25 +71,50 @@ export default function ProposalOpportunitiesFilterBar({
   /** SA / Admin / SL — show SIFC buttons for All conferences and specific */
   showSifcReportActions = false,
 }) {
+  const showMinistry = ministries.length > 0 && typeof onMinistryChange === 'function'
+  const showConference = conferences.length > 0
+  const showScopeRow = showMinistry || showConference
+
   return (
     <div className="border-b border-slate-100 bg-green-50/40 px-4 py-4 sm:px-6">
-      {conferences.length > 0 && (
-        <div className="mb-4 border-b border-green-100 pb-4">
-          <FilterSelect
-            label="Conference"
-            value={conferenceKey}
-            onChange={onConferenceChange}
-            className="max-w-full lg:max-w-2xl"
-          >
-            <option value="">All conferences</option>
-            {conferences.map((c) => (
-              <option key={c.key} value={c.key} title={c.name}>
-                {c.name}
-                {c.proposal_count != null ? ` (${c.proposal_count})` : ''}
-              </option>
-            ))}
-          </FilterSelect>
-          {showSifcReportActions && (
+      {showScopeRow && (
+        <div className="mb-4 space-y-3 border-b border-green-100 pb-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {showMinistry && (
+              <FilterSelect
+                label="Ministry"
+                value={ministryId}
+                onChange={onMinistryChange}
+                className="lg:col-span-1"
+              >
+                <option value="">All ministries</option>
+                {ministries.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </FilterSelect>
+            )}
+
+            {showConference && (
+              <FilterSelect
+                label="Conference"
+                value={conferenceKey}
+                onChange={onConferenceChange}
+                className={showMinistry ? 'sm:col-span-1 lg:col-span-2' : 'lg:col-span-2'}
+              >
+                <option value="">All conferences</option>
+                {conferences.map((c) => (
+                  <option key={c.key} value={c.key} title={c.name}>
+                    {c.name}
+                    {c.proposal_count != null ? ` (${c.proposal_count})` : ''}
+                  </option>
+                ))}
+              </FilterSelect>
+            )}
+          </div>
+
+          {showSifcReportActions && showConference && (
             <ConferenceReportActions
               conferenceKey={selectedConference?.key || conferenceKey || ''}
               conferenceName={selectedConference?.name || ''}
@@ -94,8 +122,9 @@ export default function ProposalOpportunitiesFilterBar({
               onError={onReportError}
             />
           )}
+
           {selectedConference && (
-            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            <div className="flex flex-wrap gap-2 text-xs">
               {selectedConference.mou_count != null && (
                 <span className="rounded-full bg-green-100 px-2.5 py-0.5 font-semibold text-green-800 ring-1 ring-green-200">
                   {selectedConference.mou_count} MoU
@@ -142,14 +171,14 @@ export default function ProposalOpportunitiesFilterBar({
         )}
 
         {!hideMouLifecycleFilter && (
-        <FilterSelect label="MOU Status" value={mouLifecycle} onChange={onMouLifecycleChange}>
-          <option value="">All</option>
-          {mouLifecycleStatuses.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </FilterSelect>
+          <FilterSelect label="MOU Status" value={mouLifecycle} onChange={onMouLifecycleChange}>
+            <option value="">All</option>
+            {mouLifecycleStatuses.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </FilterSelect>
         )}
 
         {sifcCategories.length > 0 && (

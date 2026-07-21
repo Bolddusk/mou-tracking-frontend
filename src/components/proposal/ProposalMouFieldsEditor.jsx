@@ -199,6 +199,10 @@ export default function ProposalMouFieldsEditor({
               )}
             </select>
           </label>
+          <label className="block">
+            <FieldLabel hint="MOU title / display name">Venture name</FieldLabel>
+            <TextInput value={form.venture_name} onChange={(v) => setScalar('venture_name', v)} />
+          </label>
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="block">
               <FieldLabel>Cooperation mode</FieldLabel>

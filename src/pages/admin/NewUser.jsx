@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import * as ministriesApi from '../../api/ministries'
 import * as usersApi from '../../api/users'
 import Alert from '../../components/Alert'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -14,21 +15,40 @@ const EMPTY_FORM = {
   sector: '',
   organization: '',
   phone: '',
+  ministry_id: '',
 }
 
 export default function NewUser() {
   const { sectors } = useSectors()
   const navigate = useNavigate()
   const [roles, setRoles] = useState([])
+  const [ministries, setMinistries] = useState([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState(EMPTY_FORM)
 
   useEffect(() => {
-    usersApi
-      .getUserRoles()
-      .then((r) => setRoles(Array.isArray(r) ? r : []))
+    Promise.all([
+      usersApi.getUserRoles(),
+      ministriesApi.listMinistries().catch(() => ({ data: [] })),
+    ])
+      .then(([r, ministryRes]) => {
+        const list = usersApi.parseAssignableUserRoles(r)
+        setRoles(list)
+        const mins = ministryRes?.data || []
+        setMinistries(mins)
+        setForm((f) => {
+          let next = { ...f }
+          if (list.length && !list.some((role) => role.value === f.role)) {
+            next.role = list[0].value
+          }
+          if (!f.ministry_id && mins[0]?.id) {
+            next.ministry_id = String(mins[0].id)
+          }
+          return next
+        })
+      })
       .catch((err) => setError(getErrorMessage(err)))
       .finally(() => setLoading(false))
   }, [])
@@ -45,11 +65,13 @@ export default function NewUser() {
   )
 
   const needsSector = selectedRole?.requires_sector
+  const needsMinistry = usersApi.MINISTRY_SCOPED_USER_ROLES.has(form.role)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.full_name.trim() || !form.email.trim() || !form.password.trim()) return
     if (needsSector && !form.sector.trim()) return
+    if (needsMinistry && !form.ministry_id) return
 
     setSubmitting(true)
     setError('')
@@ -62,6 +84,7 @@ export default function NewUser() {
         sector: needsSector ? form.sector.trim() : undefined,
         organization: form.organization.trim() || undefined,
         phone: form.phone.trim() || undefined,
+        ministry_id: needsMinistry ? Number(form.ministry_id) : undefined,
       })
       navigate(`/admin/users/${created.id}`)
     } catch (err) {
@@ -140,34 +163,38 @@ export default function NewUser() {
           </select>
         </Field>
 
+        {needsMinistry && (
+          <Field label="Ministry" required>
+            <select
+              value={form.ministry_id}
+              onChange={(e) => setForm((f) => ({ ...f, ministry_id: e.target.value }))}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              required
+            >
+              <option value="">Select ministry</option>
+              {ministries.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
         {needsSector && (
-          <Field
-            label={form.role === 'sector_lead' ? 'Sector' : 'Region / Sector'}
-            required
-          >
-            {form.role === 'sector_lead' ? (
-              <select
-                value={form.sector}
-                onChange={(e) => setForm((f) => ({ ...f, sector: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                required
-              >
-                {sectors.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type="text"
-                value={form.sector}
-                onChange={(e) => setForm((f) => ({ ...f, sector: e.target.value }))}
-                placeholder="e.g. Punjab Region"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                required
-              />
-            )}
+          <Field label="Sector" required>
+            <select
+              value={form.sector}
+              onChange={(e) => setForm((f) => ({ ...f, sector: e.target.value }))}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              required
+            >
+              {sectors.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
           </Field>
         )}
 

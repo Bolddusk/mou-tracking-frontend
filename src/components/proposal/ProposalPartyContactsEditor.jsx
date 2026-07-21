@@ -5,6 +5,7 @@ import Modal from '../Modal'
 import { ENTITY_TYPES } from '../../constants/proposalTemplate'
 import { getErrorMessage } from '../../utils/format'
 import { normalizeLoginEmail } from '../../utils/proposalDisplay'
+import { buildPartyContactsPatchBody } from '../../utils/partyContactProvision'
 
 export function emptyPartyContactInfo(defaultCountry = '') {
   return {
@@ -155,6 +156,7 @@ export default function ProposalPartyContactsEditor({
   onSaved,
 }) {
   const [form, setForm] = useState(() => partyContactsFormFromProposal(proposal))
+  const [baseline, setBaseline] = useState(() => partyContactsFormFromProposal(proposal))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -163,7 +165,9 @@ export default function ProposalPartyContactsEditor({
 
   useEffect(() => {
     if (open && proposal) {
-      setForm(partyContactsFormFromProposal(proposal))
+      const next = partyContactsFormFromProposal(proposal)
+      setForm(next)
+      setBaseline(next)
       setError('')
     }
   }, [open, proposal, editSides])
@@ -186,9 +190,16 @@ export default function ProposalPartyContactsEditor({
     setSaving(true)
     setError('')
     try {
-      const body = {}
-      if (showPartyA) body.party_a_info = { ...form.party_a_info }
-      if (showPartyB) body.party_b_info = { ...form.party_b_info }
+      const { body, empty } = buildPartyContactsPatchBody({
+        showPartyA,
+        showPartyB,
+        baseline,
+        form,
+      })
+      if (empty) {
+        setError('No contact changes to save.')
+        return
+      }
       const res = await proposalsApi.patchProposalPartyContacts(proposalId, body)
       onSaved?.(res)
       onClose?.()
@@ -220,10 +231,11 @@ export default function ProposalPartyContactsEditor({
 
       <p className="mb-4 text-sm text-slate-600">
         {showPartyA && !showPartyB
-          ? 'Update your Pakistani company contacts. Use a valid login email (e.g. name@domain.com — no extra characters).'
+          ? 'Update Pakistani company contact details only (email, phone, org, etc.). Use a valid login email (e.g. name@domain.com).'
           : showPartyB && !showPartyA
-            ? 'Update your Chinese company contacts. Use a valid login email (e.g. name@domain.com — no extra characters).'
-            : 'Saving links or creates portal logins when appropriate. Emails are stored as lowercase login addresses.'}
+            ? 'Update Chinese company contact details only (email, phone, org, etc.). Use a valid login email (e.g. name@domain.com).'
+            : 'Update Party A / Party B contact details only. Saving links or creates portal logins when appropriate.'}{' '}
+        To change Venture Name or MOU title, use <strong>Edit MOU fields</strong>.
       </p>
 
       <div className={`grid gap-6 ${showPartyA && showPartyB ? 'lg:grid-cols-2' : ''}`}>

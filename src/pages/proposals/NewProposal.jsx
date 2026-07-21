@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import * as mmApi from '../../api/matchmaking'
 import * as proposalsApi from '../../api/proposals'
 import * as conferencesApi from '../../api/conferences'
+import * as ministriesApi from '../../api/ministries'
 import * as sifcApi from '../../api/sifcCategories'
 import Alert from '../../components/Alert'
 import FinancialsEditor from '../../components/proposal/FinancialsEditor'
@@ -40,7 +41,10 @@ export default function NewProposal({ variant = 'legacy' }) {
 
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { user, isSuperAdmin, isPartyA, isInvestor } = useAuth()
+  const { user, isSuperAdmin, isPowerAdmin, isPartyA, isInvestor, ministryId, ministry, dashboardPath: authDashboardPath } =
+    useAuth()
+  /** Direct MOU create — Power Admin same flow as Super Admin */
+  const isDirectStaffAdmin = isSuperAdmin || isPowerAdmin
   const { sectors } = useSectors()
   const editProposalId = searchParams.get('edit')
   const initialStepParam = searchParams.get('step')
@@ -49,13 +53,13 @@ export default function NewProposal({ variant = 'legacy' }) {
     if (isMm) {
       return isSuperAdmin ? '/matchmaking/admin/my-proposals' : '/matchmaking/my-proposals'
     }
-    if (isSuperAdmin) return '/dashboard/super-admin'
-    return '/dashboard/party-a'
-  }, [isMm, isSuperAdmin])
+    if (isDirectStaffAdmin) return '/dashboard/super-admin'
+    return authDashboardPath || '/dashboard/party-a'
+  }, [isMm, isSuperAdmin, isDirectStaffAdmin, authDashboardPath])
 
   const initial = useMemo(() => {
     if (isMm) return mmDraft.loadFormState()
-    if (isSuperAdmin && !editProposalId) {
+    if (isDirectStaffAdmin && !editProposalId) {
       return {
         form: { ...EMPTY_PROPOSAL_FORM },
         step: 1,
@@ -64,7 +68,7 @@ export default function NewProposal({ variant = 'legacy' }) {
       }
     }
     return draft.loadFormState()
-  }, [isMm, isSuperAdmin, editProposalId])
+  }, [isMm, isDirectStaffAdmin, editProposalId])
 
   const [step, setStep] = useState(initial.step)
   const [form, setForm] = useState(initial.form)
@@ -91,6 +95,7 @@ export default function NewProposal({ variant = 'legacy' }) {
     isMm && isSuperAdmin && !initial.proposalId && !editProposalId && !mmDraft.loadOnBehalfId(),
   )
   const [conferences, setConferences] = useState([])
+  const [ministries, setMinistries] = useState([])
   const [sifcCategories, setSifcCategories] = useState([])
   const [alignmentExpanded, setAlignmentExpanded] = useState(false)
 
@@ -99,7 +104,7 @@ export default function NewProposal({ variant = 'legacy' }) {
   const orgSection = isMm ? 'submitter_info' : 'party_a_info'
 
   const isRejectedResubmit =
-    !isMm && !isSuperAdmin && proposalStatus === 'rejected'
+    !isMm && !isDirectStaffAdmin && proposalStatus === 'rejected'
 
   const ownerField = form.side === 'side_a' ? 'party_a_id' : 'investor_id'
   const ownerRole = form.side === 'side_a' ? 'party_a' : 'investor'
@@ -122,9 +127,41 @@ export default function NewProposal({ variant = 'legacy' }) {
   }, [isMm, completedSteps, proposalId])
 
   useEffect(() => {
+    if (!isDirectStaffAdmin) {
+      if (ministryId) {
+        setForm((f) => (f.ministry_id ? f : { ...f, ministry_id: String(ministryId) }))
+      }
+      return undefined
+    }
+    let cancelled = false
+    ministriesApi
+      .listMinistries()
+      .then((res) => {
+        if (cancelled) return
+        const list = res.data || []
+        setMinistries(list)
+        setForm((f) => {
+          if (f.ministry_id) return f
+          const def = list.find((m) => String(m.code).toLowerCase() === 'mnfsr') || list[0]
+          return def ? { ...f, ministry_id: String(def.id) } : f
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setMinistries([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isDirectStaffAdmin, ministryId])
+
+  useEffect(() => {
     if (isMm) return
     let cancelled = false
-    Promise.all([conferencesApi.getConferences(), sifcApi.getSifcCategories()])
+    const confParams = form.ministry_id ? { ministry_id: form.ministry_id } : {}
+    Promise.all([
+      conferencesApi.getConferences(confParams),
+      sifcApi.getSifcCategories(),
+    ])
       .then(([confRes, sifcRes]) => {
         if (cancelled) return
         const confList = Array.isArray(confRes) ? confRes : confRes?.conferences || []
@@ -143,7 +180,7 @@ export default function NewProposal({ variant = 'legacy' }) {
     return () => {
       cancelled = true
     }
-  }, [isMm])
+  }, [isMm, form.ministry_id])
 
   useEffect(() => {
     if (!isMm || isSuperAdmin || !user?.role) return
@@ -195,7 +232,7 @@ export default function NewProposal({ variant = 'legacy' }) {
   }, [isMm, editProposalId, initialStepParam])
 
   useEffect(() => {
-    if (isMm || !isSuperAdmin || !editProposalId) return
+    if (isMm || !isDirectStaffAdmin || !editProposalId) return
 
     let cancelled = false
     ;(async () => {
@@ -222,10 +259,10 @@ export default function NewProposal({ variant = 'legacy' }) {
     return () => {
       cancelled = true
     }
-  }, [isSuperAdmin, editProposalId, initialStepParam])
+  }, [isDirectStaffAdmin, editProposalId, initialStepParam])
 
   useEffect(() => {
-    if (isMm || isSuperAdmin) return
+    if (isMm || isDirectStaffAdmin) return
     if (!proposalId) {
       setProposalStatus(null)
       setSectorLeadComment('')
@@ -250,10 +287,10 @@ export default function NewProposal({ variant = 'legacy' }) {
     return () => {
       cancelled = true
     }
-  }, [proposalId, isMm, isSuperAdmin])
+  }, [proposalId, isMm, isDirectStaffAdmin])
 
   useEffect(() => {
-    if (!user || isSuperAdmin) return
+    if (!user || isDirectStaffAdmin) return
     if (isMm) {
       setForm((f) => {
         const si = f.submitter_info || {}
@@ -286,7 +323,7 @@ export default function NewProposal({ variant = 'legacy' }) {
         },
       }
     })
-  }, [user, isSuperAdmin, isMm])
+  }, [user, isDirectStaffAdmin, isMm])
 
   const applyEngagementType = (value) => {
     const suggested = suggestedEntityTypes(value)
@@ -581,7 +618,7 @@ export default function NewProposal({ variant = 'legacy' }) {
     setCompletedSteps(new Set())
     setError('')
     setFieldErrors([])
-    if (isSuperAdmin && !isMm) {
+    if (isDirectStaffAdmin && !isMm) {
       navigate('/proposals/new', { replace: true })
     }
     if (isMm) {
@@ -665,11 +702,11 @@ export default function NewProposal({ variant = 'legacy' }) {
         </div>
       )}
 
-      {isSuperAdmin && !isMm && (
+      {isDirectStaffAdmin && !isMm && (
         <div className="mx-4 mb-4 flex flex-col gap-4 border-b border-slate-100 pb-4 sm:mx-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-              Super Admin — Direct Opportunities
+              {isPowerAdmin ? 'Power Admin' : 'Super Admin'} — Direct Opportunities
             </p>
             <h3 className="mt-1 text-lg font-semibold text-slate-800">MOUS</h3>
             <p className="mt-1 text-sm text-slate-500">
@@ -771,6 +808,45 @@ export default function NewProposal({ variant = 'legacy' }) {
         {contentStep === 1 && (
           <div className="space-y-5">
             <SectionTitle step={step} totalSteps={maxStep} title="Engagement Type & Conference" />
+            {!isMm && (
+              <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-4">
+                {isDirectStaffAdmin ? (
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Ministry <span className="text-red-500">*</span>
+                    </span>
+                    <select
+                      value={form.ministry_id || ''}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          ministry_id: e.target.value,
+                          conference_key: '',
+                        }))
+                      }
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                      required
+                    >
+                      <option value="">Select ministry</option>
+                      {ministries.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <p className="text-sm text-slate-600">
+                    Ministry:{' '}
+                    <strong>
+                      {ministry?.name ||
+                        ministries.find((m) => String(m.id) === String(form.ministry_id))?.name ||
+                        'Your ministry'}
+                    </strong>
+                  </p>
+                )}
+              </div>
+            )}
             {isMm && (
               <div className="grid gap-4 sm:grid-cols-2">
                 {isSuperAdmin && (

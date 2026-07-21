@@ -113,6 +113,12 @@ export function formatUsd(amount) {
 
 export function getErrorMessage(err) {
   const data = err?.response?.data
+  if (data?.code === 'ministry_email_conflict') {
+    return (
+      data.error ||
+      'This email is already registered under a different ministry'
+    )
+  }
   if (data?.code === 'party_a_email_missing' && data?.error) {
     return data.error
   }
