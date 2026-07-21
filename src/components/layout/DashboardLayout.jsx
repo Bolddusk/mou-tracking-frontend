@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { PORTAL_SHORT } from '../../constants/branding'
+import { PORTAL_COPYRIGHT, PORTAL_ORG, PORTAL_SHORT } from '../../constants/branding'
 import { ROLE_LABELS } from '../../constants/sectors'
 import { formatScopedSectorsLabel, getScopedSectors } from '../../utils/scopedSectors'
 import {
@@ -282,10 +282,10 @@ export default function DashboardLayout({ title }) {
     <div className="flex min-h-screen bg-portal-bg">
       <aside className="hidden w-64 shrink-0 flex-col bg-sidebar text-white lg:flex">
         <div className="border-b border-white/10 px-6 py-5">
-          <p className="text-xs font-semibold uppercase tracking-widest text-green-200">
-            Government of Pakistan
+          <p className="text-[10px] font-semibold uppercase leading-snug tracking-wide text-green-200">
+            {PORTAL_ORG}
           </p>
-          <h1 className="text-lg font-bold leading-tight text-white">MOU Tracking</h1>
+          <h1 className="mt-1 text-lg font-bold leading-tight text-white">{PORTAL_SHORT}</h1>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
@@ -337,6 +337,7 @@ export default function DashboardLayout({ title }) {
             </NavLink>
           )}
           <p className="text-xs text-slate-400">{footerLabel}</p>
+          <p className="mt-3 text-[10px] leading-snug text-green-200/50">{PORTAL_COPYRIGHT}</p>
         </div>
       </aside>
 

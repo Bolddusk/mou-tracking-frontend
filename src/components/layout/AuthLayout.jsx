@@ -1,14 +1,19 @@
 import { Link, Outlet } from 'react-router-dom'
 import PortalLogo from '../brand/PortalLogo'
-import { PORTAL_COPYRIGHT, PORTAL_NAME, PORTAL_TAGLINE } from '../../constants/branding'
+import {
+  PORTAL_COPYRIGHT,
+  PORTAL_NAME,
+  PORTAL_ORG,
+  PORTAL_TAGLINE,
+} from '../../constants/branding'
 
 export default function AuthLayout() {
   return (
     <div className="flex min-h-screen bg-portal-bg">
       <div className="hidden w-1/2 flex-col bg-sidebar p-10 text-white lg:flex">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-green-200">
-            Government of Pakistan
+          <p className="text-sm font-semibold uppercase tracking-wide text-green-200">
+            {PORTAL_ORG}
           </p>
           <h1 className="mt-2 text-3xl font-bold leading-tight">{PORTAL_NAME}</h1>
           <p className="mt-4 max-w-md text-green-100/90">{PORTAL_TAGLINE}</p>
@@ -25,8 +30,8 @@ export default function AuthLayout() {
 
       <div className="flex w-full flex-col justify-center px-4 py-10 lg:w-1/2 lg:px-16">
         <div className="mb-8 flex flex-col items-center text-center lg:hidden">
-          <p className="text-xs font-semibold uppercase tracking-widest text-green-700">
-            Government of Pakistan
+          <p className="text-xs font-semibold uppercase tracking-wide text-green-700">
+            {PORTAL_ORG}
           </p>
           <h1 className="text-xl font-bold text-green-900">{PORTAL_NAME}</h1>
           <div className="mt-5 flex h-56 w-56 items-center justify-center rounded-full bg-white p-6 shadow-md">
