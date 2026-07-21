@@ -280,15 +280,15 @@ export default function DashboardLayout({ title }) {
 
   return (
     <div className="flex min-h-screen bg-portal-bg">
-      <aside className="hidden w-64 shrink-0 flex-col bg-sidebar text-white lg:flex">
-        <div className="border-b border-white/10 px-6 py-5">
+      <aside className="sticky top-0 hidden h-screen max-h-screen w-64 shrink-0 flex-col overflow-hidden bg-sidebar text-white lg:flex">
+        <div className="shrink-0 border-b border-white/10 px-6 py-5">
           <p className="text-[10px] font-semibold uppercase leading-snug tracking-wide text-green-200">
             {PORTAL_ORG}
           </p>
           <h1 className="mt-1 text-lg font-bold leading-tight text-white">{PORTAL_SHORT}</h1>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 py-4">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {useRbacNav ? (
             <RbacSidebarNav navigation={navigation} />
           ) : (
@@ -305,7 +305,7 @@ export default function DashboardLayout({ title }) {
           )}
         </nav>
 
-        <div className="border-t border-white/10 px-4 py-4">
+        <div className="shrink-0 border-t border-white/10 px-4 py-4">
           {(isPartyB || isInvestor) && (
             <NavLink
               to="/dashboard/party-b/profile"
@@ -336,8 +336,8 @@ export default function DashboardLayout({ title }) {
               Company Profile
             </NavLink>
           )}
-          <p className="text-xs text-slate-400">{footerLabel}</p>
-          <p className="mt-3 text-[10px] leading-snug text-green-200/50">{PORTAL_COPYRIGHT}</p>
+          {footerLabel ? <p className="text-xs text-slate-400">{footerLabel}</p> : null}
+          <p className="mt-2 text-[10px] leading-snug text-green-200/70">{PORTAL_COPYRIGHT}</p>
         </div>
       </aside>
 
