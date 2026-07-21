@@ -1,4 +1,4 @@
-export const PORTAL_LOGO_PATH = '/brand/State_emblem_of_Pakistan.svg.png'
+export const PORTAL_LOGO_PATH = '/brand/mnfsr-logo.jpg'
 
 /** Eyebrow above the product title (sidebar + auth) */
 export const PORTAL_ORG = 'Ministry of National Food Security & Research'

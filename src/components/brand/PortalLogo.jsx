@@ -13,7 +13,7 @@ export default function PortalLogo({ size = 'md', className = '' }) {
   return (
     <img
       src={PORTAL_LOGO_PATH}
-      alt="State Emblem of Pakistan"
+      alt="MNFSR"
       className={`${SIZES[size] || SIZES.md} shrink-0 object-contain ${className}`}
     />
   )
