@@ -1,5 +1,6 @@
 import {
   buildScopeLabel,
+  buildSectorLabel,
   formatAgreementType,
   formatReportAmount,
   formatReportCell,
@@ -114,12 +115,13 @@ function DetailSection({ title, variant, rows = [] }) {
     <section className="mt-8 break-before-page print:mt-6">
       <div className="bg-[#fff200] py-2 text-center text-base font-bold text-slate-900">{title}</div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1100px] border-collapse text-xs">
+        <table className="w-full min-w-[1200px] border-collapse text-xs">
           <thead>
             <tr className="bg-[#548235] text-center font-semibold text-white">
               <th className="border border-slate-800 px-2 py-2 w-10">Sr. No</th>
               <th className="border border-slate-800 px-2 py-2 min-w-[120px]">Pak. company</th>
               <th className="border border-slate-800 px-2 py-2 min-w-[120px]">Chinese company</th>
+              <th className="border border-slate-800 px-2 py-2 min-w-[90px]">Sector</th>
               <th className="border border-slate-800 px-2 py-2 min-w-[100px]">
                 MoU Value (USD M)
                 {!isExecution && ' / location'}
@@ -128,32 +130,40 @@ function DetailSection({ title, variant, rows = [] }) {
                 {isExecution ? 'Outcome' : 'Product'}
               </th>
               <th className="border border-slate-800 px-2 py-2 min-w-[200px]">Status/Feedback</th>
-              <th className="border border-slate-800 px-2 py-2 min-w-[100px]">
-                {isExecution ? 'Action Taken' : 'Bottlenecks'}
-              </th>
+              <th className="border border-slate-800 px-2 py-2 min-w-[120px]">Bottleneck</th>
               <th className="border border-slate-800 px-2 py-2 min-w-[90px]">Tentative Timelines</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => {
-              const valueCell = [row.value_label, row.location].filter(Boolean).join('\n') || formatReportAmount(row.mou_value_usd_m)
-              const extraCell = isExecution ? row.action_taken : row.bottlenecks
+              const valueCell =
+                [row.value_label, row.location].filter(Boolean).join('\n') ||
+                formatReportAmount(row.mou_value_usd_m)
               const descriptionCell = isExecution ? row.outcome : row.product
 
               return (
                 <tr key={row.sr} className="align-top bg-white">
                   <td className="border border-slate-800 px-2 py-2 text-center">{row.sr}</td>
-                  <td className="border border-slate-800 px-2 py-2">{formatReportCell(row.pak_company)}</td>
-                  <td className="border border-slate-800 px-2 py-2">{formatReportCell(row.chinese_company)}</td>
+                  <td className="border border-slate-800 px-2 py-2">
+                    {formatReportCell(row.pak_company)}
+                  </td>
+                  <td className="border border-slate-800 px-2 py-2">
+                    {formatReportCell(row.chinese_company)}
+                  </td>
+                  <td className="border border-slate-800 px-2 py-2">
+                    {formatReportCell(row.sector)}
+                  </td>
                   <td className="border border-slate-800 px-2 py-2 whitespace-pre-wrap text-center">
                     {formatReportCell(valueCell)}
                   </td>
-                  <td className="border border-slate-800 px-2 py-2">{formatReportCell(descriptionCell)}</td>
+                  <td className="border border-slate-800 px-2 py-2">
+                    {formatReportCell(descriptionCell)}
+                  </td>
                   <td className="border border-slate-800 px-2 py-2 whitespace-pre-wrap">
                     {formatReportCell(row.status_feedback)}
                   </td>
                   <td className="border border-slate-800 px-2 py-2 whitespace-pre-wrap">
-                    {formatReportCell(extraCell)}
+                    {formatReportCell(row.bottlenecks)}
                   </td>
                   <td className="border border-slate-800 px-2 py-2 text-center whitespace-pre-wrap">
                     {formatReportCell(row.tentative_timeline)}
@@ -172,7 +182,10 @@ export default function ConferenceReportView({ report }) {
   if (!report) return null
 
   const { conference, scope, generated_at, proposal_count, snapshot, sections } = report
+  const sectorLabel = buildSectorLabel(scope)
   const scopeLabel = buildScopeLabel(scope)
+  const conferenceLabel =
+    conference?.name || conference?.report_title || conference?.key || 'All conferences'
 
   return (
     <article className="conference-report mx-auto max-w-[1200px] bg-white p-4 font-serif text-slate-900 sm:p-8 print:p-0">
@@ -183,9 +196,13 @@ export default function ConferenceReportView({ report }) {
         {conference?.name && conference?.report_title && (
           <p className="mt-1 text-sm text-slate-600">{conference.name}</p>
         )}
-        <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-500 print:text-[10px]">
-          {proposal_count != null && <span>{proposal_count} MOUs</span>}
-          {scopeLabel && <span>{scopeLabel}</span>}
+        <p className="mt-2 text-xs text-slate-500 print:text-[10px]">
+          {conferenceLabel}
+          {proposal_count != null ? ` · ${proposal_count} MOUs` : ''}
+          {` · ${sectorLabel}`}
+        </p>
+        <div className="mt-1 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-500 print:text-[10px]">
+          {scopeLabel && scopeLabel !== sectorLabel && <span>{scopeLabel}</span>}
           {generated_at && <span>Generated {new Date(generated_at).toLocaleString()}</span>}
         </div>
       </header>

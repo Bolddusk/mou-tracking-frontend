@@ -18,12 +18,31 @@ export function formatReportCell(value) {
   return text || '—'
 }
 
+/** Selected Opportunities sector filter, if any. */
+export function getReportSectorFilter(scope) {
+  const raw = scope?.filters?.sector
+  if (raw == null) return ''
+  const text = String(raw).trim()
+  return text && text !== 'all' ? text : ''
+}
+
+/**
+ * Subtitle sector segment: exact selected sector name, else "All sectors".
+ * Never "All sectors (filtered)".
+ */
+export function buildSectorLabel(scope) {
+  return getReportSectorFilter(scope) || 'All sectors'
+}
+
 export function buildScopeLabel(scope) {
   if (!scope) return null
-  const filtered = scope.filters_applied === true ? ' (filtered)' : ''
-  if (scope.list_scope === 'all') return `All sectors${filtered}`
+  const sectorFilter = getReportSectorFilter(scope)
+  if (sectorFilter) return sectorFilter
+
+  if (scope.list_scope === 'all') return 'All sectors'
+
   const sectors = scope.sectors?.length ? scope.sectors : scope.sector ? [scope.sector] : []
-  if (sectors.length) return `Sector scope: ${sectors.join(', ')}${filtered}`
-  if (scope.list_scope === 'own') return `Linked MOUs only${filtered}`
-  return `Sector-scoped report${filtered}`
+  if (sectors.length) return sectors.join(', ')
+  if (scope.list_scope === 'own') return 'Linked MOUs only'
+  return 'Sector-scoped report'
 }

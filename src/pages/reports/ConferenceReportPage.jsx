@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext'
 import { ROLES } from '../../constants/sectors'
 import { getErrorMessage } from '../../utils/format'
 import { buildConferenceReportParams } from '../../utils/conferenceReportQuery'
+import { buildSectorLabel } from '../../utils/conferenceReportFormat'
 
 const REPORT_ROLES = new Set([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.SECTOR_LEAD])
 
@@ -121,13 +122,13 @@ export default function ConferenceReportPage() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 SIFC report
-                {report?.scope?.filters_applied ? ' · filtered' : ''}
               </p>
               <p className="text-sm font-semibold text-slate-900">
                 {report?.conference?.name ||
                   report?.conference?.report_title ||
                   (conferenceKey ? conferenceKey : 'All conferences')}
                 {report?.proposal_count != null ? ` · ${report.proposal_count} MOUs` : ''}
+                {report ? ` · ${buildSectorLabel(report.scope)}` : ''}
               </p>
             </div>
           </div>
