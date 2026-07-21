@@ -6,7 +6,7 @@ const SIZES = {
   lg: 'h-32 w-32',
   xl: 'h-48 w-48',
   '2xl': 'h-64 w-64',
-  hero: 'h-80 w-80',
+  hero: 'h-full w-full',
 }
 
 export default function PortalLogo({ size = 'md', className = '' }) {
@@ -14,7 +14,7 @@ export default function PortalLogo({ size = 'md', className = '' }) {
     <img
       src={PORTAL_LOGO_PATH}
       alt="MNFSR"
-      className={`${SIZES[size] || SIZES.md} shrink-0 object-contain ${className}`}
+      className={`${SIZES[size] || SIZES.md} shrink-0 rounded-full object-cover ${className}`}
     />
   )
 }

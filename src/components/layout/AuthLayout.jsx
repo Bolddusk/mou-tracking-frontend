@@ -19,8 +19,8 @@ export default function AuthLayout() {
           <p className="mt-4 max-w-md text-green-100/90">{PORTAL_TAGLINE}</p>
         </div>
 
-        <div className="flex flex-1 items-center justify-center py-10">
-          <div className="flex h-[26rem] w-[26rem] items-center justify-center rounded-full bg-white p-10 shadow-xl shadow-black/25">
+        <div className="flex flex-1 items-center justify-center py-8">
+          <div className="h-[min(28rem,55vh)] w-[min(28rem,55vh)] overflow-hidden rounded-full bg-sidebar shadow-xl shadow-black/30 ring-4 ring-white/25">
             <PortalLogo size="hero" />
           </div>
         </div>
@@ -34,8 +34,8 @@ export default function AuthLayout() {
             {PORTAL_ORG}
           </p>
           <h1 className="text-xl font-bold text-green-900">{PORTAL_NAME}</h1>
-          <div className="mt-5 flex h-56 w-56 items-center justify-center rounded-full bg-white p-6 shadow-md">
-            <PortalLogo size="2xl" />
+          <div className="mt-5 h-64 w-64 overflow-hidden rounded-full bg-sidebar shadow-md ring-2 ring-green-800/20">
+            <PortalLogo size="hero" />
           </div>
         </div>
         <div className="mx-auto w-full max-w-md rounded-2xl border border-green-100 bg-white p-6 shadow-lg shadow-green-900/5 sm:p-8">
